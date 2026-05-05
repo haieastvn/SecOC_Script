@@ -1,0 +1,51 @@
+/*@!Encoding:1252*/
+ includes
+{
+ 
+}
+on key 'p'
+{
+    ethSetLinkStatus(ethernetport::Ethernet1::Port1, 0);
+}
+
+on key 's'
+{
+    ethSetLinkStatus(ethernetport::Ethernet1::Port1, 1);
+}
+
+testfunction Eth_Enable()
+{
+  ethSetLinkStatus(ethernetport::Ethernet1::Port1, 1);
+  write("%d", ethGetLinkStatus(ethernetport::Ethernet1::Port1));
+}
+testfunction Eth_Disable()
+{
+  ethSetLinkStatus(ethernetport::Ethernet1::Port1, 0);
+  write("%d", ethGetLinkStatus(ethernetport::Ethernet1::Port1));
+}
+export testfunction Eth_SetLinkStatus(byte status)
+{
+  int rel;
+   ethernetport myEthernetPort ;
+//  rel=ethGetLinkStatus(ethernetport::Ethernet1::Port1);
+  if(status==0)
+  {
+    testStep("EthLink","Disable Ethernet PORT");
+    Eth_Disable();
+    rel = TestWaitForEthernetLinkStatus(ethernetport::Ethernet1::Port1, 0, 2000);
+    if(rel ==1)
+      testStepPass("EthLink","Disable Ethernet Port is execute");
+    else
+      testStepFail ("EthLink","Disable Ethernet Port isn't execute");
+  }
+  else
+  {
+    testStep("EthLink","Enable Ethernet PORT");
+    Eth_Enable();
+    rel = TestWaitForEthernetLinkStatus(ethernetport::Ethernet1::Port1, 1, 2000);
+    if(rel ==1)
+      testStepPass("EthLink","Enable Ethernet Port is execute");
+    else
+      testStepFail ("EthLink","Enable Ethernet Port isn't execute");   
+  }
+}

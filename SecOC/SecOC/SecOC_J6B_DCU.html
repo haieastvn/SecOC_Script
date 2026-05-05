@@ -1,0 +1,507 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <title>SecOC</title>
+    <style type="text/css">
+
+          
+          
+          
+          @media screen
+          {
+            body
+            {
+              background-color: rgb(255, 255, 255);
+              font-family:      arial, verdana, trebuchet, officina, sans-serif;
+            }
+          }
+
+          
+          @media print
+          {
+            
+            body
+            {
+              background-color: rgb(255, 255, 255);
+            }
+
+            
+            a
+            {
+              text-decoration: none;
+            }
+
+            
+
+            .HeadingTable, .SubHeadingTable, .GroupHeadingTable, .GroupEndTable
+            {
+              border-width: 2px;
+              border-style: solid;
+              border-color: rgb(150,150,150);
+            }
+
+            table.OverviewTable
+            {
+              border-collapse: collapse;
+            }
+
+            .DefaultCell, .DefineCell, .NumberCell
+            {
+              border-width: 1px;
+              border-style: solid;
+              border-color: rgb(150,150,150);
+            }
+          }
+
+          
+
+          table
+          {
+            margin-bottom:  10px;
+            vertical-align: top;
+          }
+
+          .HeadingTable
+          {
+            width:            100%;
+            text-align:       center;
+            margin-top:       15px;
+            margin-bottom:    30px;
+            margin-left:      auto;
+            margin-right:     auto;
+            background-color: rgb(220, 221, 222);
+          }
+
+          .SubHeadingTable
+          {
+            width:            100%;
+            text-align:       center;
+            margin-top:       15px;
+            margin-bottom:    25px;
+            background-color: rgb(220, 221, 222);
+          }
+
+          .GroupHeadingTable, .GroupEndTable
+          {
+            width:            100%;
+            text-align:       center;
+            margin-top:       15px;
+            padding-right:    20px;
+            background-color: rgb(220, 221, 222);
+          }
+
+          .CellNoColor
+          {
+            text-align: left;
+          }
+
+          td.DefineCell
+          {
+            background-color: rgb(179, 179, 179);
+            text-align:       left;
+          }
+
+          th.DefineCell
+          {
+            background-color: rgb(179, 179, 179);
+            text-align:       center;
+            font-weight:      bold;
+          }
+
+          .DefaultCell
+          {
+            background-color: rgb(229, 229, 229);
+            text-align:       left;
+          }
+
+          .NumberCell
+          {
+            background-color: rgb(229, 229, 229);
+            text-align:       center;
+            min-width:        50px;
+          }
+
+          
+
+          .Heading1
+          {
+            font-family: arial, sans-serif;
+            font-weight: bold;
+            font-size:   26px;
+          }
+
+          .Heading2
+          {
+            font-family: arial, sans-serif;
+            font-weight: bold;
+            font-size:   20px;
+          }
+
+          .Heading3
+          {
+            font-family:   arial, sans-serif;
+            font-weight:   bold;
+            font-size:     18px;
+            margin-bottom: 20px;
+            margin-top:    20px;
+          }
+
+          .Heading4
+          {
+            font-family:   arial, sans-serif;
+            font-weight:   bold;
+            font-size:     16px;
+            margin-top:    10px;
+            margin-bottom: 10px;
+          }
+
+          
+
+          img
+          {
+            margin-bottom: 20px;
+          }
+
+          
+          p
+          {
+            margin-bottom: 20px;
+          }
+
+          
+          .Indentation
+          {
+            margin-left: 20px;
+          }
+
+        </style>
+  </head>
+  <body>
+    <table class="HeadingTable" border="0" cellspacing="1" cellpadding="2">
+      <tr>
+        <td>
+          <big class="Heading1">
+                  Testmodule: SecOC,
+                  Version R07</big>
+        </td>
+      </tr>
+    </table>
+    <table class="SubHeadingTable" cellspacing="1" cellpadding="2" border="0">
+      <tr>
+        <td>
+          <div class="Heading2">General Test Information</div>
+        </td>
+      </tr>
+    </table>
+    <div class="Indentation"></div>
+    <table class="SubHeadingTable" cellspacing="1" cellpadding="2" border="0">
+      <tr>
+        <td>
+          <div class="Heading2">Test Overview</div>
+        </td>
+      </tr>
+    </table>
+    <div class="Indentation">
+      <div class="Heading4">Test Structure</div>
+      <div class="Indentation">
+        <table class="OverviewTable" cellpadding="2" cellspacing="1" border="0">
+          <tr>
+            <td class="DefineCell">
+              <b>1</b>
+            </td>
+            <td class="DefineCell">
+              <b></b>
+            </td>
+            <td class="DefineCell">
+              <b>
+                <a href="#i__690830720_10">Master</a>
+              </b>
+            </td>
+          </tr>
+          <tr>
+            <td class="DefineCell">1.1 </td>
+            <td class="DefaultCell"></td>
+            <td class="DefaultCell">
+              <a href="#i__690830720_15">TC_SecOC_01</a>
+            </td>
+          </tr>
+          <tr>
+            <td class="DefineCell">1.2 </td>
+            <td class="DefaultCell"></td>
+            <td class="DefaultCell">
+              <a href="#i__690830720_20">TC_SecOC_02</a>
+            </td>
+          </tr>
+          <tr>
+            <td class="DefineCell">1.3 </td>
+            <td class="DefaultCell"></td>
+            <td class="DefaultCell">
+              <a href="#i__690830720_25">TC_SecOC_03</a>
+            </td>
+          </tr>
+          <tr>
+            <td class="DefineCell">1.4 </td>
+            <td class="DefaultCell"></td>
+            <td class="DefaultCell">
+              <a href="#i__690830720_30">TC_SecOC_04</a>
+            </td>
+          </tr>
+          <tr>
+            <td class="DefineCell">1.5 </td>
+            <td class="DefaultCell"></td>
+            <td class="DefaultCell">
+              <a href="#i__690830720_35">TC_SecOC_05</a>
+            </td>
+          </tr>
+          <tr>
+            <td class="DefineCell">1.6 </td>
+            <td class="DefaultCell"></td>
+            <td class="DefaultCell">
+              <a href="#i__690830720_40">TC_SecOC_06</a>
+            </td>
+          </tr>
+          <tr>
+            <td class="DefineCell">1.7 </td>
+            <td class="DefaultCell"></td>
+            <td class="DefaultCell">
+              <a href="#i__690830720_45">TC_SecOC_07_IPD_BKPCANFD_50ms_FrP49</a>
+            </td>
+          </tr>
+          <tr>
+            <td class="DefineCell">1.8 </td>
+            <td class="DefaultCell"></td>
+            <td class="DefaultCell">
+              <a href="#i__690830720_50">TC_SecOC_07_ICBAD_BKPCANFD_100ms_FrP29</a>
+            </td>
+          </tr>
+          <tr>
+            <td class="DefineCell">1.9 </td>
+            <td class="DefaultCell"></td>
+            <td class="DefaultCell">
+              <a href="#i__690830720_55">TC_SecOC_07_ICBAD_RZCUCANFD_20ms_FrP15</a>
+            </td>
+          </tr>
+          <tr>
+            <td class="DefineCell">1.10 </td>
+            <td class="DefaultCell"></td>
+            <td class="DefaultCell">
+              <a href="#i__690830720_60">TC_SecOC_08_09_IAM_BKPCANFD_20ms_FrP10</a>
+            </td>
+          </tr>
+          <tr>
+            <td class="DefineCell">1.11 </td>
+            <td class="DefaultCell"></td>
+            <td class="DefaultCell">
+              <a href="#i__690830720_65">TC_SecOC_08_IAM_ZONE_CONNCANFD_Event_FrS01</a>
+            </td>
+          </tr>
+          <tr>
+            <td class="DefineCell">1.12 </td>
+            <td class="DefaultCell"></td>
+            <td class="DefaultCell">
+              <a href="#i__690830720_70">TC_SecOC_08_IAM_ZONE_CONNCANFD_Event_FrS02</a>
+            </td>
+          </tr>
+          <tr>
+            <td class="DefineCell">1.13 </td>
+            <td class="DefaultCell"></td>
+            <td class="DefaultCell">
+              <a href="#i__690830720_75">TC_SecOC_08_IAM_ZONE_CONNCANFD_Event_FrS03</a>
+            </td>
+          </tr>
+          <tr>
+            <td class="DefineCell">1.14 </td>
+            <td class="DefaultCell"></td>
+            <td class="DefaultCell">
+              <a href="#i__690830720_80">TC_SecOC_08_ICBVC_BKPCANFD_50ms_FrP55</a>
+            </td>
+          </tr>
+          <tr>
+            <td class="DefineCell">1.15 </td>
+            <td class="DefaultCell"></td>
+            <td class="DefaultCell">
+              <a href="#i__690830720_85">TC_SecOC_08_LHZCU_LHBKBCANFD_50ms_FrP07</a>
+            </td>
+          </tr>
+          <tr>
+            <td class="DefineCell">1.16 </td>
+            <td class="DefaultCell"></td>
+            <td class="DefaultCell">
+              <a href="#i__690830720_90">TC_SecOC_08_RZCU_RZCUCANFD_10ms_FrP22</a>
+            </td>
+          </tr>
+          <tr>
+            <td class="DefineCell">1.17 </td>
+            <td class="DefaultCell"></td>
+            <td class="DefaultCell">
+              <a href="#i__690830720_95">TC_SecOC_08_RZCU_RZCUCANFD_10ms_FrP23</a>
+            </td>
+          </tr>
+          <tr>
+            <td class="DefineCell">1.18 </td>
+            <td class="DefaultCell"></td>
+            <td class="DefaultCell">
+              <a href="#i__690830720_100">TC_SecOC_12</a>
+            </td>
+          </tr>
+          <tr>
+            <td class="DefineCell">1.19 </td>
+            <td class="DefaultCell"></td>
+            <td class="DefaultCell">
+              <a href="#i__690830720_105">TC_SecOC_13</a>
+            </td>
+          </tr>
+        </table>
+      </div>
+    </div>
+    <table class="SubHeadingTable" cellspacing="1" cellpadding="2" border="0">
+      <tr>
+        <td>
+          <big class="Heading2">Test Module Information</big>
+        </td>
+      </tr>
+    </table>
+    <table class="SubHeadingTable" cellspacing="1" cellpadding="2" border="0">
+      <tr>
+        <td>
+          <big class="Heading2">Test Case Details</big>
+        </td>
+      </tr>
+    </table>
+    <table class="GroupHeadingTable">
+      <tr>
+        <td>
+          <big class="Heading3">1<a name="i__690830720_10"> Test Group: Master</a>
+          </big>
+        </td>
+      </tr>
+    </table>
+    <p>
+      <big class="Heading3">1.1 <a name="i__690830720_15">CAPL Test Case : TC_SecOC_01</a>
+      </big>
+      <br>
+      <div class="Indentation"></div>
+    </p>
+    <p>
+      <big class="Heading3">1.2 <a name="i__690830720_20">CAPL Test Case : TC_SecOC_02</a>
+      </big>
+      <br>
+      <div class="Indentation"></div>
+    </p>
+    <p>
+      <big class="Heading3">1.3 <a name="i__690830720_25">CAPL Test Case : TC_SecOC_03</a>
+      </big>
+      <br>
+      <div class="Indentation"></div>
+    </p>
+    <p>
+      <big class="Heading3">1.4 <a name="i__690830720_30">CAPL Test Case : TC_SecOC_04</a>
+      </big>
+      <br>
+      <div class="Indentation"></div>
+    </p>
+    <p>
+      <big class="Heading3">1.5 <a name="i__690830720_35">CAPL Test Case : TC_SecOC_05</a>
+      </big>
+      <br>
+      <div class="Indentation"></div>
+    </p>
+    <p>
+      <big class="Heading3">1.6 <a name="i__690830720_40">CAPL Test Case : TC_SecOC_06</a>
+      </big>
+      <br>
+      <div class="Indentation"></div>
+    </p>
+    <p>
+      <big class="Heading3">1.7 <a name="i__690830720_45">CAPL Test Case : TC_SecOC_07_IPD_BKPCANFD_50ms_FrP49</a>
+      </big>
+      <br>
+      <div class="Indentation"></div>
+    </p>
+    <p>
+      <big class="Heading3">1.8 <a name="i__690830720_50">CAPL Test Case : TC_SecOC_07_ICBAD_BKPCANFD_100ms_FrP29</a>
+      </big>
+      <br>
+      <div class="Indentation"></div>
+    </p>
+    <p>
+      <big class="Heading3">1.9 <a name="i__690830720_55">CAPL Test Case : TC_SecOC_07_ICBAD_RZCUCANFD_20ms_FrP15</a>
+      </big>
+      <br>
+      <div class="Indentation"></div>
+    </p>
+    <p>
+      <big class="Heading3">1.10 <a name="i__690830720_60">CAPL Test Case : TC_SecOC_08_09_IAM_BKPCANFD_20ms_FrP10</a>
+      </big>
+      <br>
+      <div class="Indentation"></div>
+    </p>
+    <p>
+      <big class="Heading3">1.11 <a name="i__690830720_65">CAPL Test Case : TC_SecOC_08_IAM_ZONE_CONNCANFD_Event_FrS01</a>
+      </big>
+      <br>
+      <div class="Indentation"></div>
+    </p>
+    <p>
+      <big class="Heading3">1.12 <a name="i__690830720_70">CAPL Test Case : TC_SecOC_08_IAM_ZONE_CONNCANFD_Event_FrS02</a>
+      </big>
+      <br>
+      <div class="Indentation"></div>
+    </p>
+    <p>
+      <big class="Heading3">1.13 <a name="i__690830720_75">CAPL Test Case : TC_SecOC_08_IAM_ZONE_CONNCANFD_Event_FrS03</a>
+      </big>
+      <br>
+      <div class="Indentation"></div>
+    </p>
+    <p>
+      <big class="Heading3">1.14 <a name="i__690830720_80">CAPL Test Case : TC_SecOC_08_ICBVC_BKPCANFD_50ms_FrP55</a>
+      </big>
+      <br>
+      <div class="Indentation"></div>
+    </p>
+    <p>
+      <big class="Heading3">1.15 <a name="i__690830720_85">CAPL Test Case : TC_SecOC_08_LHZCU_LHBKBCANFD_50ms_FrP07</a>
+      </big>
+      <br>
+      <div class="Indentation"></div>
+    </p>
+    <p>
+      <big class="Heading3">1.16 <a name="i__690830720_90">CAPL Test Case : TC_SecOC_08_RZCU_RZCUCANFD_10ms_FrP22</a>
+      </big>
+      <br>
+      <div class="Indentation"></div>
+    </p>
+    <p>
+      <big class="Heading3">1.17 <a name="i__690830720_95">CAPL Test Case : TC_SecOC_08_RZCU_RZCUCANFD_10ms_FrP23</a>
+      </big>
+      <br>
+      <div class="Indentation"></div>
+    </p>
+    <p>
+      <big class="Heading3">1.18 <a name="i__690830720_100">CAPL Test Case : TC_SecOC_12</a>
+      </big>
+      <br>
+      <div class="Indentation"></div>
+    </p>
+    <p>
+      <big class="Heading3">1.19 <a name="i__690830720_105">CAPL Test Case : TC_SecOC_13</a>
+      </big>
+      <br>
+      <div class="Indentation"></div>
+    </p>
+    <table class="GroupEndTable">
+      <tr>
+        <td>End of Test Group Master</td>
+      </tr>
+    </table>
+    <table class="SubHeadingTable" cellspacing="1" cellpadding="2" border="0">
+      <tr>
+        <td>
+          <div class="Heading2">End of Testmodule</div>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

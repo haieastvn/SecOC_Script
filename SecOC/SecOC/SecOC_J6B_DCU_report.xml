@@ -1,0 +1,334 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<testmodule starttime="2026-04-29 15:27:58" timestamp="   1.918622" verdicts="2_basic">
+  <testgroup>
+    <skipped starttime="2026-04-29 15:27:58" timestamp="   1.918622">
+      <title>TC_SecOC_01</title>
+    </skipped>
+    <testcase starttime="2026-04-29 15:27:58" timestamp="   1.918622">
+      <teststep timestamp="   2.918622" level="1" type="auto" ident="Resume reason" result="na">Elapsed time=1000ms (max=1000ms)</teststep>
+      <testpattern timestamp="   2.918622" name="ResetSocketID" type="testpattern">
+        <title>ResetSocketID</title>
+        <result timestamp="   2.918622" result="pass"/>
+      </testpattern>
+      <testpattern timestamp="   2.918622" name="Reset_P_Switch_ECU" type="testpattern">
+        <title>Reset_P_Switch_ECU</title>
+        <teststep timestamp="   2.918622" level="0" type="user" ident="P_Switch" result="pass">Turn off -&gt; turn on</teststep>
+        <teststep timestamp="   3.918622" level="1" type="auto" ident="Resume reason" result="na">Elapsed time=1000ms (max=1000ms)</teststep>
+        <result timestamp="   3.918622" result="pass"/>
+      </testpattern>
+      <teststep timestamp="   4.598068" level="1" type="auto" ident="Resume reason" result="na">Resumed on TextEvent &apos;ECU_Wakeup&apos; Elapsed time=679.446ms (max=5000ms)</teststep>
+      <teststep timestamp="   4.598068" level="0" type="user" ident="Precondition" result="pass">ECU wakeup</teststep>
+      <testpattern timestamp="   4.598068" name="ComKey_EnableReq" type="testpattern">
+        <title>ComKey_EnableReq</title>
+        <teststep timestamp="   4.598068" level="0" type="user" ident="ComKey_EnableReq" result="na">ICBVC_SecOCComKeyReq_PDU01_pdu.IComKeyEnbReq= 0x1</teststep>
+        <result timestamp="   4.598068" result="pass"/>
+      </testpattern>
+      <testpattern timestamp="   4.598068" name="TripCnt_ResetReq" type="testpattern">
+        <title>TripCnt_ResetReq</title>
+        <teststep timestamp="   4.598068" level="0" type="user" ident="TripCnt_ResetReq" result="na">Send ITripCntResetReq signal equal 0x1</teststep>
+        <result timestamp="   4.598068" result="pass"/>
+      </testpattern>
+      <teststep timestamp="   4.798068" level="1" type="auto" ident="Resume reason" result="na">Elapsed time=200ms (max=200ms)</teststep>
+      <testpattern timestamp="   4.798068" name="Send_SecOC_Sync_Msg_J6B" type="testpattern">
+        <title>Send_SecOC_Sync_Msg_J6B</title>
+        <teststep timestamp="   4.798068" level="0" type="user" ident="Send_SecOC_Sync_Msg_J6B" result="na">Send Syn message with tripcnt= 0x1, resetcnt= 0x1</teststep>
+        <result timestamp="   4.798068" result="pass"/>
+      </testpattern>
+      <testpattern timestamp="   4.799068" name="Send_SecOC_Sync_Msg" type="testpattern">
+        <title>Send_SecOC_Sync_Msg</title>
+        <teststep timestamp="   4.799068" level="0" type="user" ident="Send_SecOC_Rx_Msg_MAC" result="pass"> Data message: 00 00 01 00 01 98 4A 46</teststep>
+        <result timestamp="   4.799068" result="pass"/>
+      </testpattern>
+      <testpattern timestamp="   4.809068" name="Send_SecOC_Sync_Msg" type="testpattern">
+        <title>Send_SecOC_Sync_Msg</title>
+        <teststep timestamp="   4.809068" level="0" type="user" ident="Send_SecOC_Rx_Msg_MAC" result="pass"> Data message: 00 00 01 00 01 98 4A 46</teststep>
+        <result timestamp="   4.809068" result="pass"/>
+      </testpattern>
+      <testpattern timestamp="   4.819068" name="Send_SecOC_Sync_Msg" type="testpattern">
+        <title>Send_SecOC_Sync_Msg</title>
+        <teststep timestamp="   4.819068" level="0" type="user" ident="Send_SecOC_Rx_Msg_MAC" result="pass"> Data message: 00 00 01 00 01 98 4A 46</teststep>
+        <result timestamp="   4.819068" result="pass"/>
+      </testpattern>
+      <teststep timestamp="   5.298068" level="1" type="auto" ident="Resume reason" result="na">Elapsed time=500ms (max=500ms)</teststep>
+      <testpattern timestamp="   5.298068" name="Waitfor_Tx_Msg" type="testpattern">
+        <title>Waitfor_Tx_Msg</title>
+        <teststep timestamp="   5.298068" level="0" type="user" ident="Waitfor_Tx_Msg" result="na">Wait for Master Tx within 300 ms</teststep>
+        <teststep timestamp="   5.365295" level="1" type="auto" ident="Resume reason" result="na">Resumed on TextEvent &apos;Waitfor_Tx_Msg_event&apos; Elapsed time=67.2276ms (max=300ms)</teststep>
+        <teststep timestamp="   5.365295" level="0" type="user" ident="Waitfor_Tx_Msg" result="pass">Received message after 7 ms</teststep>
+        <teststep timestamp="   5.375295" level="1" type="auto" ident="Resume reason" result="na">Elapsed time=10ms (max=10ms)</teststep>
+        <result timestamp="   5.375295" result="pass"/>
+      </testpattern>
+      <testpattern timestamp="   5.375295" name="Verify_SecOC_Tx_Msg" type="testpattern">
+        <title>Verify_SecOC_Tx_Msg</title>
+        <teststep timestamp="   5.375295" level="0" type="user" ident="Data_authenic" result="na">Data_authenic: 03 95 FF FF FF FF FF 03 00 00 00 00 01 00 01 00 00 05</teststep>
+        <teststep timestamp="   5.375295" level="0" type="user" ident="Verify_MAC" result="fail">MAC mismatch | Expected MAC: 38 8B 16 | Actual MAC: BD 75 A1</teststep>
+        <teststep timestamp="   5.375295" level="0" type="user" ident="Verify_FVTxLength_Data" result="fail">Freshness Value mismatch | Expected FV: 0x5 | Actual FV: 0x19</teststep>
+        <result timestamp="   5.375295" result="fail"/>
+      </testpattern>
+      <testpattern timestamp="   5.375295" name="Send_SecOC_Sync_Msg_J6B" type="testpattern">
+        <title>Send_SecOC_Sync_Msg_J6B</title>
+        <teststep timestamp="   5.375295" level="0" type="user" ident="Send_SecOC_Sync_Msg_J6B" result="na">Send Syn message with tripcnt= 0x1, resetcnt= 0x2</teststep>
+        <result timestamp="   5.375295" result="pass"/>
+      </testpattern>
+      <testpattern timestamp="   5.375295" name="Waitfor_Tx_Msg" type="testpattern">
+        <title>Waitfor_Tx_Msg</title>
+        <teststep timestamp="   5.375295" level="0" type="user" ident="Waitfor_Tx_Msg" result="na">Wait for Master Tx within 500 ms</teststep>
+        <testpattern timestamp="   5.376295" name="Send_SecOC_Sync_Msg" type="testpattern">
+          <title>Send_SecOC_Sync_Msg</title>
+          <teststep timestamp="   5.376295" level="0" type="user" ident="Send_SecOC_Rx_Msg_MAC" result="pass"> Data message: 00 00 01 00 02 CE A8 69</teststep>
+          <result timestamp="   5.376295" result="pass"/>
+        </testpattern>
+        <testpattern timestamp="   5.386295" name="Send_SecOC_Sync_Msg" type="testpattern">
+          <title>Send_SecOC_Sync_Msg</title>
+          <teststep timestamp="   5.386295" level="0" type="user" ident="Send_SecOC_Rx_Msg_MAC" result="pass"> Data message: 00 00 01 00 02 CE A8 69</teststep>
+          <result timestamp="   5.386295" result="pass"/>
+        </testpattern>
+        <testpattern timestamp="   5.396295" name="Send_SecOC_Sync_Msg" type="testpattern">
+          <title>Send_SecOC_Sync_Msg</title>
+          <teststep timestamp="   5.396295" level="0" type="user" ident="Send_SecOC_Rx_Msg_MAC" result="pass"> Data message: 00 00 01 00 02 CE A8 69</teststep>
+          <result timestamp="   5.396295" result="pass"/>
+        </testpattern>
+        <teststep timestamp="   5.465300" level="1" type="auto" ident="Resume reason" result="na">Resumed on TextEvent &apos;Waitfor_Tx_Msg_event&apos; Elapsed time=90.0041ms (max=500ms)</teststep>
+        <teststep timestamp="   5.465300" level="0" type="user" ident="Waitfor_Tx_Msg" result="pass">Received message after 9 ms</teststep>
+        <teststep timestamp="   5.475300" level="1" type="auto" ident="Resume reason" result="na">Elapsed time=10ms (max=10ms)</teststep>
+        <result timestamp="   5.475300" result="pass"/>
+      </testpattern>
+      <testpattern timestamp="   5.475300" name="Verify_SecOC_Tx_Msg" type="testpattern">
+        <title>Verify_SecOC_Tx_Msg</title>
+        <teststep timestamp="   5.475300" level="0" type="user" ident="Data_authenic" result="na">Data_authenic: 03 95 FF FF FF FF FF 03 00 00 00 00 01 00 02 00 00 06</teststep>
+        <teststep timestamp="   5.475300" level="0" type="user" ident="Verify_MAC" result="fail">MAC mismatch | Expected MAC: 4C DE 16 | Actual MAC: D6 CA 48</teststep>
+        <teststep timestamp="   5.475300" level="0" type="user" ident="Verify_FVTxLength_Data" result="fail">Freshness Value mismatch | Expected FV: 0x6 | Actual FV: 0x1d</teststep>
+        <result timestamp="   5.475300" result="fail"/>
+      </testpattern>
+      <testpattern timestamp="   5.475300" name="StopTest" type="testpattern">
+        <title>StopTest</title>
+        <!-- Measurement stop forced. Test is incomplete! -->
+        <result timestamp="   0.000000" result="fail"/>
+      </testpattern>
+      <verdict time="2026-04-29 15:28:01" timestamp="   5.375295" endtime="2026-04-29 15:28:02" endtimestamp="   5.475300" result="fail" />
+      <title>TC_SecOC_02</title>
+      <extendedinfo type="html"><![CDATA[<b>Measurement stop forced. Test is incomplete!</b>]]></extendedinfo>
+    </testcase>
+    <title>Master</title>
+  </testgroup>
+  <verdict time="2026-04-29 15:28:01" timestamp="   5.375295" endtime="2026-04-29 15:28:02" endtimestamp="   5.475300" result="fail" />
+  <title>SecOC</title>
+  <testlogfiles>
+    <testlogfile file="..\..\..\J6B_DCU_Configuration_Ver1_ori\J6B_DCU_Configuration_Ver1\J6B_DCU_Configuration\MAIN_LOG.asc" logbegin="Active at test start" logend="   1.918622" />
+    <testlogfile file="..\..\..\J6B_DCU_Configuration_Ver1_ori\J6B_DCU_Configuration_Ver1\J6B_DCU_Configuration\TestLogs\TC_SecOC_02\TC_SecOC_02-Apr_29_15_27_59.asc" logbegin="   2.918622" logend="Active at test end" />
+  </testlogfiles>
+  <engineer>
+    <xinfo>
+      <name>Windows Login Name</name>
+      <description>Admin</description>
+    </xinfo>
+  </engineer>
+  <testsetup>
+    <xinfo>
+      <name>Version</name>
+      <description>CANoe.ISO11783.J1939.CANopen.CAN.LIN.MOST.FlexRay.J1587.Ethernet.Car2x.A429.AMD/XCP.Scope /pro 12.0.75</description>
+    </xinfo>
+    <xinfo>
+      <name>Configuration</name>
+      <description>F:\00_HaiN\Env\J6B_DCU_Configuration_Ver1_ori\J6B_DCU_Configuration_Ver1\J6B_DCU_Configuration\J6B_DCU_12_Hai_Ver12.cfg</description>
+    </xinfo>
+    <xinfo>
+      <name>Database BKPCANFD on BKPCANFD_1</name>
+      <description>F:\00_HaiN\Env\J6B_DCU_Configuration_Ver1_ori\J6B_DCU_Configuration_Ver1\J6B_DCU_Configuration\Databases\20251120-bl1-IS4PR-IPD_V2.1.arxml-revHEAD.svn001.tmp.arxml (2026-03-10 09:29:00)</description>
+    </xinfo>
+    <xinfo>
+      <name>Database CHCANFD on CHCANFD_2</name>
+      <description>F:\00_HaiN\Env\J6B_DCU_Configuration_Ver1_ori\J6B_DCU_Configuration_Ver1\J6B_DCU_Configuration\Databases\20251120-bl1-IS4PR-IPD_V2.1.arxml-revHEAD.svn001.tmp.arxml (2026-03-10 09:29:00)</description>
+    </xinfo>
+    <xinfo>
+      <name>Database FDRLocalCANFD on FDRLocalCANFD_5</name>
+      <description>F:\00_HaiN\Env\J6B_DCU_Configuration_Ver1_ori\J6B_DCU_Configuration_Ver1\J6B_DCU_Configuration\Databases\20260130-bl1-AdasLocal-IPD_V2.0.arxml (2026-03-13 20:13:17)</description>
+    </xinfo>
+    <xinfo>
+      <name>Database PTCANFD on PTCANFD_4</name>
+      <description>F:\00_HaiN\Env\J6B_DCU_Configuration_Ver1_ori\J6B_DCU_Configuration_Ver1\J6B_DCU_Configuration\Databases\20251120-bl1-IS4PR-IPD_V2.1.arxml-revHEAD.svn001.tmp.arxml (2026-03-10 09:29:00)</description>
+    </xinfo>
+    <xinfo>
+      <name>Database RDALocalCANFD on RDACANFD_6</name>
+      <description>F:\00_HaiN\Env\J6B_DCU_Configuration_Ver1_ori\J6B_DCU_Configuration_Ver1\J6B_DCU_Configuration\Databases\20260130-bl1-AdasLocal-IPD_V2.0.arxml (2026-03-13 20:13:17)</description>
+    </xinfo>
+    <xinfo>
+      <name>Database SFCANFD on SFCANFD_3</name>
+      <description>F:\00_HaiN\Env\J6B_DCU_Configuration_Ver1_ori\J6B_DCU_Configuration_Ver1\J6B_DCU_Configuration\Databases\20251120-bl1-IS4PR-IPD_V2.1.arxml-revHEAD.svn001.tmp.arxml (2026-03-10 09:29:00)</description>
+    </xinfo>
+    <xinfo>
+      <name>Diagnostic Description of SAIC_J6B_DCU</name>
+      <description>Base_Variant, en-US, F:\00_HaiN\Env\J6B_DCU_Configuration_Ver1_ori\J6B_DCU_Configuration_Ver1\J6B_DCU_Configuration\CDD\SAIC_J6B_DCU.cdd</description>
+    </xinfo>
+    <xinfo>
+      <name>Test Module Name</name>
+      <description>SecOC_J6B_DCU</description>
+    </xinfo>
+    <xinfo>
+      <name>Test Module File</name>
+      <description>F:\00_HaiN\Env\Script\SecOC\SecOC\SecOC_J6B_DCU.xml</description>
+    </xinfo>
+    <xinfo>
+      <name>Last modification of Test Module File</name>
+      <description>2026-04-29, 14:05:32</description>
+    </xinfo>
+    <xinfo>
+      <name>Test Module Library (CAPL)</name>
+      <description>F:\00_HaiN\Env\Script\SecOC\SecOC\SecOC_J6B_DCU.can</description>
+    </xinfo>
+    <xinfo>
+      <name>Windows Computer Name</name>
+      <description>PS2022XVZPQILX</description>
+    </xinfo>
+    <xinfo>
+      <name>Nodelayer Module AsrPDUIL2</name>
+      <description>CANoe AutoSAR PDU Interaction Layer NL (General OEM) Version 2.85.78 (Jun 24 2022 15:39:15) , F:\00_HaiN\Env\J6B_DCU_Configuration_Ver1_ori\J6B_DCU_Configuration_Ver1\J6B_DCU_Configuration\Exec32\AsrPDUIL2.dll</description>
+    </xinfo>
+    <xinfo>
+      <name>Nodelayer Module AVB_IL</name>
+      <description>Vector CANoe/CANalyzer Runtime Kernel, Version 12.0.75, C:\Program Files\Vector CANoe 12.0__3\Exec32\RuntimeKernel.exe</description>
+    </xinfo>
+    <xinfo>
+      <name>Nodelayer Module J1939TestServiceLibraryNL</name>
+      <description>J1939 Test Service Library for CANoe, Version 12.0.75.0, C:\Program Files\Vector CANoe 12.0__3\Exec32\J1939TestServiceLibraryNL.dll</description>
+    </xinfo>
+  </testsetup>
+  <hardware name="CAN Channel Interfaces" category="CategoryCANIF">
+    <xinfoset type="device">
+      <xinfoobject type="device">
+      <xinfo key="channel">
+        <name>Channel</name>
+        <description>1</description>
+      </xinfo>
+      <xinfo key="device">
+        <name>Device</name>
+        <description>VN1640</description>
+      </xinfo>
+      <xinfo key="serialnumber">
+        <name>Serial number</name>
+        <description>33156</description>
+      </xinfo>
+      <xinfo key="driverdllversion">
+        <name>Driver DLL version</name>
+        <description>23.20.10</description>
+      </xinfo>
+      <xinfo key="driverversion">
+        <name>Driver version</name>
+        <description>23.10.18</description>
+      </xinfo>
+      </xinfoobject>
+      <xinfoobject type="device">
+      <xinfo key="channel">
+        <name>Channel</name>
+        <description>2</description>
+      </xinfo>
+      <xinfo key="device">
+        <name>Device</name>
+        <description>VN1640</description>
+      </xinfo>
+      <xinfo key="serialnumber">
+        <name>Serial number</name>
+        <description>33156</description>
+      </xinfo>
+      <xinfo key="driverdllversion">
+        <name>Driver DLL version</name>
+        <description>23.20.10</description>
+      </xinfo>
+      <xinfo key="driverversion">
+        <name>Driver version</name>
+        <description>23.10.18</description>
+      </xinfo>
+      </xinfoobject>
+      <xinfoobject type="device">
+      <xinfo key="channel">
+        <name>Channel</name>
+        <description>3</description>
+      </xinfo>
+      <xinfo key="device">
+        <name>Device</name>
+        <description>VN1640</description>
+      </xinfo>
+      <xinfo key="serialnumber">
+        <name>Serial number</name>
+        <description>33156</description>
+      </xinfo>
+      <xinfo key="driverdllversion">
+        <name>Driver DLL version</name>
+        <description>23.20.10</description>
+      </xinfo>
+      <xinfo key="driverversion">
+        <name>Driver version</name>
+        <description>23.10.18</description>
+      </xinfo>
+      </xinfoobject>
+      <xinfoobject type="device">
+      <xinfo key="channel">
+        <name>Channel</name>
+        <description>4</description>
+      </xinfo>
+      <xinfo key="device">
+        <name>Device</name>
+        <description>VN1640</description>
+      </xinfo>
+      <xinfo key="serialnumber">
+        <name>Serial number</name>
+        <description>33156</description>
+      </xinfo>
+      <xinfo key="driverdllversion">
+        <name>Driver DLL version</name>
+        <description>23.20.10</description>
+      </xinfo>
+      <xinfo key="driverversion">
+        <name>Driver version</name>
+        <description>23.10.18</description>
+      </xinfo>
+      </xinfoobject>
+      <xinfoobject type="device">
+      <xinfo key="channel">
+        <name>Channel</name>
+        <description>5</description>
+      </xinfo>
+      <xinfo key="device">
+        <name>Device</name>
+        <description>VN1640</description>
+      </xinfo>
+      <xinfo key="serialnumber">
+        <name>Serial number</name>
+        <description>33156</description>
+      </xinfo>
+      <xinfo key="driverdllversion">
+        <name>Driver DLL version</name>
+        <description>23.20.10</description>
+      </xinfo>
+      <xinfo key="driverversion">
+        <name>Driver version</name>
+        <description>23.10.18</description>
+      </xinfo>
+      </xinfoobject>
+      <xinfoobject type="device">
+      <xinfo key="channel">
+        <name>Channel</name>
+        <description>6</description>
+      </xinfo>
+      <xinfo key="device">
+        <name>Device</name>
+        <description>VN1640</description>
+      </xinfo>
+      <xinfo key="serialnumber">
+        <name>Serial number</name>
+        <description>33156</description>
+      </xinfo>
+      <xinfo key="driverdllversion">
+        <name>Driver DLL version</name>
+        <description>23.20.10</description>
+      </xinfo>
+      <xinfo key="driverversion">
+        <name>Driver version</name>
+        <description>23.10.18</description>
+      </xinfo>
+      </xinfoobject>
+    </xinfoset>
+  </hardware>
+  <extendedinfo type="html"><![CDATA[<b>Measurement stop forced. Test is incomplete!</b>]]></extendedinfo>
+</testmodule>
+<!--footprint="bd82e5071a0c336f485b0519503a5359" version="1"-->

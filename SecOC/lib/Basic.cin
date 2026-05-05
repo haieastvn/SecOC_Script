@@ -1,0 +1,426 @@
+/*@!Encoding:936*/
+/*
+Author: PhongNguyen
+Nickname: NgMiPh
+Note: Yearning4.year
+Date:1/1/2023
+*/
+includes
+{
+//  #include "ct.cin"
+}
+
+variables
+{
+  char ECU_WakeUp_502[100] = "ECU_Wakeup_502";
+  
+  byte StopTest_Flag=0;
+   const int gLenPduRaw = 12285;
+  byte logflag;
+  
+  IP_Address  EcuIp;
+  IP_Address  TesterIp;
+  
+  
+  dword gTesterLogicAddr;
+  dword gVehicleLogicAddr;
+  dword gFunctionalLogicAddr;
+  
+  /////////////////////////////
+  const int max = 255;
+  dword TcpSocket[max];
+  dword socket;
+  dword CloseSocket;
+  enum Bool 
+  {
+    kFalse,
+    kTrue
+  };
+  
+ //Control receive DoIP data on tcp or udp 
+  enum TransportFiltre
+  {
+    kTcp,
+    kUdp
+  };
+  enum TransportFiltre L4Protocol;
+ 
+  dword expectLen;
+  byte expectdata[1500];
+
+  float MaxTime; 
+  byte TestLogicAddr[2], EcuPhyAddr[2], EcuFunctionAddr[2]; //logic address
+  byte TesterUnknowAddr[2], EcuUnknowAddr[2];
+  byte TesterAddrArray[max + 1][2];
+  dword TesterPortArray[max + 1];
+  ip_Address TestIpaddrArray[max];
+  char TesterIpStr[16], EcuIpStr[16],TesterIpStr2[16];
+  dword EcuPort;
+  dword TesterPort;
+  dword MaxHeaderlen;
+  dword MaxDiagLen;
+  
+//To put data of DoIP
+//  byte TxPktData[9000];
+  byte TxPktData[65534];
+  
+/**
+  Time Parameter
+  ListenTime: The time the tester waits for a response
+  ErrorLimit: The range of allowable errors
+  MaxSocketNum: The maximum number of TCP connections supported for diagnosis
+  MaxPayloadLen:the maximum DoIP message payload size supported by the DoIP entity regardless of the current memory utilization
+**/ 
+  float A_DoIP_Diagnostic_Message;
+  float T_TCP_Alive_Check;
+  float T_TCP_General_Inactivity;
+  float T_TCP_Initial_Inactivity;
+  float P2server1;
+  float P2server;
+  float S3server;
+  float A_DOIP_Announce_Num;
+  float A_DOIP_Announce_Interval;
+  float A_DOIP_Announce_Wait;
+  float ListenTime;
+  float ErrorLimit;
+  byte MaxSocketNum;
+  byte VIN[17];
+  byte EID[6];
+  byte GID[6];
+  byte NodeType;
+//  byte Maxdatasize[4];
+  int waitflag;
+  char Diagmsg[100] = "diag msg";
+  char Diagackmsg[100] = "diag ack msg";
+  char Diagnackmsg[100] = "diag nack msg";
+  char AliveCheck[100] = "alive check";
+  char HeaderNack[100] = "header nack";
+  char Routresp[100] = "routing resp";
+  char vehicileId[100] = "vehicile resp";
+  char vehicileId1[100] = "vehicile resp";
+  char DoIPEntity[100] = "DoIPEntity";
+  char PowerMode[100] = "PowerMode";
+  char PayloadTypeF002[100] = "PayloadTypeF002";
+  char PayloadTypeF005[100] = "PayloadTypeF005";
+  char PayloadTypeF007[100] = "PayloadTypeF007";
+  char DhcpType[100] = "Discover req";
+  
+char tempIP[50];
+  
+}
+void CompareParameters(byte data[], dword length)
+{
+  word msgType;
+  int rel;
+  byte payload[1500];
+  msgType = (dword)(data[2]<<8) + (dword)( data[3]);
+  
+  if(msgType == 0x8001) //Diagnostic message
+  {
+    memcpy_off(payload, 0, data, 8, length);
+    if(memcmp(payload, expectdata, expectLen)==0)
+      testSupplyTextEvent(Diagmsg);
+    return;
+  }
+ 
+  if(msgType == 0x8002) //Diagnostic message positive acknowledgement
+  {
+    if(data[12] !=0)
+      testStep("CompareParameters", "Diagnost ack message with ack code is 0x%x", data[12]);
+    testSupplyTextEvent(Diagackmsg);
+    return;
+  }
+  
+  if(msgType== 0x8003) //Diagnostic message negative acknowledgement
+  {
+    memcpy_off(payload, 0, data, 8, length);
+    if(memcmp(payload, expectdata, expectLen)==0)
+      testSupplyTextEvent(Diagnackmsg);
+    return;
+  }
+  
+  if(msgType == 0x07) //Alive check request
+  {
+    testSupplyTextEvent(AliveCheck);
+    return;
+  }
+  
+  if(msgType == 0x00) //Generic DoIP header negative acknowledge
+  {
+    memcpy_off(payload, 0, data, 8, length);
+    if(memcmp(payload, expectdata, expectLen)==0)
+      testSupplyTextEvent(HeaderNack);
+    return;
+  }
+  
+  if(msgType == 0xF002) //F0002
+  {
+      testSupplyTextEvent(PayloadTypeF002);
+    return;
+  }
+  if(msgType == 0xF005) //F0005
+  {
+      testSupplyTextEvent(PayloadTypeF005);
+    return;
+  }
+  if(msgType == 0xF007) //F0007
+  {
+      testSupplyTextEvent(PayloadTypeF007);
+    return;
+  }
+   if(msgType == 0x06) //Routing activation response
+  {
+    memcpy_off(payload, 0, data, 8, length);
+    if(memcmp(payload, expectdata, expectLen)==0)
+      testSupplyTextEvent(Routresp);
+    return;
+  }
+  
+  if(msgType == 0x04)  //Vehicle announcement message
+  {
+    testSupplyTextEvent(vehicileId1);
+    memcpy_off(payload, 0, data, 8, length);
+    if(memcmp(payload, expectdata, expectLen)==0)
+      testSupplyTextEvent(vehicileId);
+    return;
+  }
+  if(msgType == 0x4002) //DoIP entity status response
+  {
+    testSupplyTextEvent(vehicileId1);
+    memcpy_off(payload, 0, data, 8, length);
+    if(memcmp(payload, expectdata, expectLen)==0)
+      testSupplyTextEvent(DoIPEntity);
+    return;
+  }
+ 
+  if(msgType == 0x4004) //Diagnostic power mode information response
+  {
+    testSupplyTextEvent(PowerMode);
+    return;
+  }
+}
+
+
+
+void BeginTest(char logName[])
+{ 
+  char timestap[50];
+     char s[200];
+    char report[200];
+  strncpy(s, "TestLogs\\", 100);
+  strncat(s, logName, 100);
+  strncat(s, "\\", 100);
+  strncat(s, logName, 100);
+  strncat(s,"-", 100);
+    if(mbstrlen(timestap)==0)
+  {
+    char tem[100];
+    stopLogging();
+    testWaitForTimeout(1000);
+    getLocalTimeString(tem);
+    mbsubstr_cpy_off(timestap, 0, tem, 4, 15);
+    timestap[3]='_';
+    timestap[6]='_';
+    timestap[9]='_';
+    timestap[12]='_';
+  }
+  strncat(s,timestap, 200);
+  strncpy(report, s, 200);
+  strncat(s, ".asc", 200);
+  write("%s", s);
+  setLogFileName("Logging", s);
+  startLogging("Logging");
+  TestReportFileName(report);
+  StopTest_Flag=0;
+  Getparameters();
+  ResetSocketID();
+  // Add Tester Source Address IP into network
+  ipAddAdapterAddress(1, ipGetAddressAsNumber(TesterIpStr), ipGetAddressAsNumber("255.255.0.0"));
+}
+void disconnectSocket( )
+{
+  int i;
+    for(i = 0; i< max; i++)
+  {
+    if(TcpSocket[i] != 0)
+    {
+      TcpClose(TcpSocket[i]);
+      break ;
+    }
+  }
+}
+
+export testfunction StopTest()
+{
+  StopTest_Flag=1;
+  testWaitForTimeout(2000);
+  ResetSocketID();
+  stopLogging();
+  setLogFileName("Logging", "MAIN_LOG");
+  startLogging("Logging");
+  stopLogging();
+  
+}
+export testfunction Reset_P_Switch_ECU()
+{
+  // Reset Power
+  testStepPass("P_Switch","Turn off -> turn on");
+
+  @sysvar::KA3005P::P_Switch=0;
+  testWaitForTimeout(1000);
+  @sysvar::KA3005P::P_Switch = 1;
+}
+
+export testfunction Reset_P_Switch_ECU_Report_502()
+{
+  // Reset Power
+  testStepPass("P_Switch","Turn off -> turn on");
+  @sysvar::KA3005P::P_Switch = 0;
+  testWaitForTimeout(1000);
+  @sysvar::KA3005P::P_Switch = 1;
+  testWaitForTextEvent("ECU_Wakeup_502", 10000);
+}
+export testfunction ResetSocketID()
+{
+  int i;
+  long rel;
+  char err_String[100];
+  
+  for(i = 0; i< max; i++)
+  {
+    tcpAbort(TcpSocket[i]);
+    TcpSocket[i] = 0;
+  }  
+//  testWaitForTimeout(200);
+}
+export testfunction CloseSocketID()
+{
+ byte i;
+  for(i = 0; i< max; i++)
+  {
+    if(TcpSocket[i] != 0)
+    {
+      if(tcpClose(TcpSocket[i]) == 0)
+      {
+        TcpSocket[i] = 0;
+      }
+    }
+  }  
+//  testWaitForTimeout(200);
+}
+
+//Get parameter from system variables
+void Getparameters()
+{
+ 
+  EcuPort=13400;
+  TesterPort=13400;
+
+
+//  EcuPhyAddr[0]=0x10;
+//  EcuPhyAddr[1]=0x15;
+////   EcuPhyAddr[0]=0x13;
+////  EcuPhyAddr[1]=0x01;
+//  TestLogicAddr[0]=0x0E;
+//  TestLogicAddr[1]=0x80;
+//  EcuFunctionAddr[0]=0x00;
+//  EcuFunctionAddr[1]=0x01;
+
+  diagGetTargetQualifier( 0,  EcuIpStr,elCount(EcuIpStr)) < 0 || diagSetTarget(EcuIpStr) ;
+  diagGetCommParameter( "DoIP.TESTER_IPAddress", 0, TesterIpStr, elcount( TesterIpStr));
+  gTesterLogicAddr = diagGetCommParameter("DoIP.TESTER_LogicalAddress");
+  gVehicleLogicAddr = diagGetCommParameter("DoIP.VEHICLE_LogicalAddress");
+  gFunctionalLogicAddr = diagGetCommParameter("DoIP.FunctionalAddress");
+   EcuIp = IP_Address(198.18.36.96);
+//  EcuIp = IP_Address(198.18.36.1);
+  TesterIp = IP_Address(198.18.32.1);
+  if (EcuIp.PrintAddressToString( EcuIpStr ) == 0);
+  if (TesterIp.PrintAddressToString( TesterIpStr ) == 0);
+  if (EcuIp.PrintAddressToString( EcuIpStr ) == 0);
+  TestLogicAddr[1]=gTesterLogicAddr&0xFF;
+  TestLogicAddr[0]=((gTesterLogicAddr& 0xFF00)>>8);
+  EcuPhyAddr[1]=gVehicleLogicAddr&0xFF;
+  EcuPhyAddr[0]=(gVehicleLogicAddr&0xFF00)>>8;
+  EcuFunctionAddr[1]=gFunctionalLogicAddr&0xFF;
+  EcuFunctionAddr[0]=(gFunctionalLogicAddr&0xFF00)>>8;
+    write("ECUIP %s",EcuIpStr);
+    write("TesterIP %s",TesterIpStr);
+    write("TestLogicAddr %x  %x",TestLogicAddr[0],TestLogicAddr[1]);
+    write("EcuPhyAddr %x  %x",EcuPhyAddr[0],EcuPhyAddr[1]);
+    ListenTime=2000;// verify with door
+  P2server1=25;
+  P2server=25;
+  S3server=5000;
+  A_DOIP_Announce_Num=0;
+  A_DOIP_Announce_Interval=500;
+  A_DOIP_Announce_Wait=1000;
+}
+
+
+void ConfigPayload(byte data1[], byte srcaddr[], byte dstaddr[])
+{
+ 
+  memcpy_off(data1, 0, srcaddr, 0, 2);
+  memcpy_off(data1, 2, dstaddr, 0, 2);
+}
+
+void ConfigPayload10session(byte data1[], byte srcaddr[], byte dstaddr[])
+{
+  memcpy_off(data1, 0, srcaddr, 0, 2);
+  memcpy_off(data1, 2, dstaddr, 0, 2);
+  data1[4] =0x10;
+  data1[5] =0x01;
+//  testStep("payload","%x %x %x %x %x %x",data1[0],data1[1],data1[2],data1[3],data1[4],data1[5]);
+}
+
+void ByteArray_To_String(byte buffer[], DWORD buffersize, char strPDU[])
+{
+    
+    int i = 0,j = 0;
+    int v ,m;
+    char vChar,mChar;
+    char strKVCTmp[4];
+  
+    strKVCTmp[2] = ' ';
+    strncpy (strPDU,"",elcount(strPDU));
+    
+    for(i = 0;i < buffersize;i++)
+    {
+        v = buffer[i]/16;
+        m = buffer[i]%16;
+     
+        if(v>=0&&v<=9)	
+        {
+            v+=48;
+        }	
+        else if( v>=97&&v<=122)	
+        {
+            v=v+87;
+        }	
+        else 
+        {
+            v=v+55;
+        }	
+        vChar = (char)v;
+        
+        if(m>=0&&m<=9) 
+        {
+            m+=48;
+        }
+        else if( m>=97&&m<=122)
+        {
+            m=m+87;
+        }
+        else 
+        {
+            m=m+55;
+        }
+        mChar = (char)m;
+        
+        strKVCTmp[0] = vChar;
+        strKVCTmp[1] = mChar;
+        
+        strncat(strPDU, strKVCTmp, gLenPduRaw); 
+    }
+    str_replace(strPDU, strlen(strPDU)-1, "", 1); 
+}

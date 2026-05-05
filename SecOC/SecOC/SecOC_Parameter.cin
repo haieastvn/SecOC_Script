@@ -1,0 +1,116 @@
+/*@!Encoding:1252*/
+/*@!Encoding:1252*/
+includes
+{
+
+}
+
+variables
+{
+
+  byte key_auth_Init[16] = {0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0A,0x0B,0x0C,0x0D,0x0E,0x0F,0x10};
+  byte key_auth[16] = {0x45,0xA3,0xD7,0x86,0x30,0x38,0x97,0x1B,0x77,0xDB,0x79,0x97,0x2C,0xAD,0x76,0xDE};
+  
+  byte Trip_Cnt_bitSize=24;
+  byte Reset_Cnt_bitSize=16;
+  byte Msg_Cnt_bitSize=22;
+  byte Msg_Cnt_Lower_bitSize=6;
+  byte ResetFlag_bitSize=2;
+  byte Fv_truncated_bitLen=8;
+  byte Fv_bitLen=64;
+
+  byte MAC_Truncated_bitLen=24;
+  byte MAC_byteLen=16;
+
+ 
+
+  
+  //Sync message
+  message ICBVC_SecOC_SyncMsg SecOC_Syn_msg;
+  //Tx BKPCANFD
+  message IPD_BKPCANFD_50ms_FrP49 IPD_BKPCANFD_50ms_FrP49_MsgID_0x2DD;
+  message ICBAD_BKPCANFD_100ms_FrP29 ICBAD_BKPCANFD_100ms_FrP29_Msg_0x395;
+  
+  //RX BKPCANFD
+  message IAM_BKPCANFD_20ms_FrP10 IAM_BKPCANFD_20ms_FrP10_msg;
+  message IAM_ZONE_CONNCANFD_Event_FrS01 IAM_ZONE_CONNCANFD_Event_FrS01_msg;
+  message IAM_ZONE_CONNCANFD_Event_FrS02 IAM_ZONE_CONNCANFD_Event_FrS02_msg;
+  message IAM_ZONE_CONNCANFD_Event_FrS03 IAM_ZONE_CONNCANFD_Event_FrS03_msg;
+  message ICBVC_BKPCANFD_50ms_FrP55 ICBVC_BKPCANFD_50ms_FrP55_msg;
+  
+  //Tx CHCANFD
+  //Rx CHCANFD
+  message LHZCU_LHBKBCANFD_50ms_FrP07 LHZCU_LHBKBCANFD_50ms_FrP07_msg;
+  message RZCU_RZCUCANFD_10ms_FrP22 RZCU_RZCUCANFD_10ms_FrP22_msg;  
+  
+  //Tx PTCANFD
+  message ICBAD_RZCUCANFD_20ms_FrP15 ICBAD_RZCUCANFD_20ms_FrP15_msg;
+  //Rx PTCANFD
+  message RZCU_RZCUCANFD_10ms_FrP23 RZCU_RZCUCANFD_10ms_FrP23_msg;
+  pdu RZCU_10ms_PDU23 RZCU_10ms_PDU23_pdu;
+  
+  
+  
+  //Tx SFCANFD
+
+  //Rx SFCANFD
+
+  char ECU_Wakeup[50]="ECU_Wakeup"; 
+  char Waitfor_Tx_Msg_event[50]="Waitfor_Tx_Msg_event";
+  dword Waitfor_Tx_Msg_ID=0x00;
+  byte i;
+  
+  byte Data_MsgID_0x22 ;
+}
+
+on message*
+{
+    
+  if(this.id == 0xB2)
+  {
+  Data_MsgID_0x22 = ICBAD_SecOCLog_PDU01_pdu.IIPDDataId;
+  write("Value is 0x%02X;",Data_MsgID_0x22);
+  }
+  if(this.dir != rx) return;
+  TestSupplyTextEvent(ECU_Wakeup);
+  if(this.id==Waitfor_Tx_Msg_ID)
+  {
+    TestSupplyTextEvent(Waitfor_Tx_Msg_event);
+      write("Waitfor_Tx_Msg_event");
+     if(_ceil((float)MAC_Truncated_bitLen/(float)8)==(float)MAC_Truncated_bitLen/(float)8)
+    {
+      for(i=0;i<(MAC_Truncated_bitLen/8);i++)
+      {
+        CMAC_Received[i]=this.byte(this.DataLength-MAC_Truncated_bitLen/8+i);
+//        testStep("CMAC_Received","CMAC_Received[%i]=0x%x",i,CMAC_Received[i]);
+
+      }
+      FV_TxLength_Data_Received=this.byte(this.DataLength-MAC_Truncated_bitLen/8-1);
+      for(i=0;i<(this.DataLength-(MAC_Truncated_bitLen+Fv_truncated_bitLen)/8);i++)
+      {
+        Data_msg_Received[i]=this.byte(i);
+      }
+    }
+    else
+    {
+  //    for(i=0,i<(byte)_ceil((float)28/(float)8),i++)
+  //    {
+  //      CMAC_Received[i]=Txmsg.byte(Txmsg.dlc-28/8+i);
+  //    }
+    }
+    Waitfor_Tx_Msg_ID=0x00;
+  }
+  if(this.id=SecOC_Syn_msg.id)
+  {
+    //TestSupplyTextEvent(SecOC_Syn_Msg_Event);
+    Trip_Cnt_Received=$ICBVC_SecOC_SyncMsg::ITripCnt.raw;
+    Reset_Cnt_Received=$ICBVC_SecOC_SyncMsg::IResetCnt.raw;
+//    CMAC_Received=$ICBVC_SecOC_SyncMsg::ICBVC_SecOC_SyncMsg_AuthInfo.raw;
+  }
+  else
+  {
+    
+  }
+    
+}
+

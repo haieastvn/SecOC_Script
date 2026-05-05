@@ -1,0 +1,28 @@
+<testmodule title="SecOC" version="R07">
+  <testgroup title="Master">
+   	 <capltestcase  name="TC_SecOC_01"/>
+   	 <capltestcase  name="TC_SecOC_02"/>
+   	 <capltestcase  name="TC_SecOC_03"/>
+  	 <capltestcase  name="TC_SecOC_04"/>
+	 <capltestcase  name="TC_SecOC_05"/>
+	 <capltestcase  name="TC_SecOC_06"/>
+	 <capltestcase  name="TC_SecOC_07_IPD_BKPCANFD_50ms_FrP49"/>	 
+	 <capltestcase  name="TC_SecOC_07_ICBAD_BKPCANFD_100ms_FrP29"/>
+   	 <capltestcase  name="TC_SecOC_07_ICBAD_RZCUCANFD_20ms_FrP15"/>
+   	 <capltestcase  name="TC_SecOC_08_09_IAM_BKPCANFD_20ms_FrP10"/>
+   	 <capltestcase  name="TC_SecOC_08_IAM_ZONE_CONNCANFD_Event_FrS01"/>
+  	 <capltestcase  name="TC_SecOC_08_IAM_ZONE_CONNCANFD_Event_FrS02"/>
+	 <capltestcase  name="TC_SecOC_08_IAM_ZONE_CONNCANFD_Event_FrS03"/>
+	 <capltestcase  name="TC_SecOC_08_ICBVC_BKPCANFD_50ms_FrP55"/>
+	 <capltestcase  name="TC_SecOC_08_LHZCU_LHBKBCANFD_50ms_FrP07"/>	 
+	 <capltestcase  name="TC_SecOC_08_RZCU_RZCUCANFD_10ms_FrP22"/>
+   	 <capltestcase  name="TC_SecOC_08_RZCU_RZCUCANFD_10ms_FrP23"/>
+	 <capltestcase  name="TC_SecOC_09_RZCU_RZCUCANFD_10ms_FrP23_WrongMAC"/>
+	 <capltestcase   name="TC_SecOC_10_RZCU_RZCUCANFD_10ms_FrP23_Replay_InRange"/>
+	 <capltestcase   name="TC_SecOC_11_RZCU_RZCUCANFD_10ms_FrP23_Replay_OutOfRange"/>
+   	 <capltestcase  name="TC_SecOC_12"/>
+   	 <capltestcase  name="TC_SecOC_13"/>
+  </testgroup>
+
+ 
+</testmodule>

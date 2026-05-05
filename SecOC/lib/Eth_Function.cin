@@ -1,0 +1,2471 @@
+/*@!Encoding:936*/
+/*
+Author: PhongNguyen
+Nickname: NgMiPh
+Note: Yearning4.year
+Date:1/1/2023
+*/
+includes
+{
+  #include "Basic.cin"
+  #include "UDS_ETH_RAW.cin"
+  #include "Security27_ETH.cin"
+}
+
+variables
+{
+  
+    msTimer Send_501;
+    int Result_Resp;
+    message 0x501 NM501 = {DLC=8, byte(0)=0x01, byte(1)=0x50,byte(2)=0xFF, byte(3)=0xFF, byte(4)=0xFF, byte(5)=0xFF, byte(6)=0xFF, byte(7)=0xFF };
+    msTimer TesterPresent_Timer;
+  byte ListenPort=0;
+    char IPaddressSTR[1000];
+  //////
+ ip_Address 198.18.255.255 BroadCastIPAddress;
+ ethernetPacket ICMMsg;
+  byte LENGTH1=1;
+//  byte PAYLOAD1[50]={0xFF,0xFF,0x00,0x31};
+//  byte PAYLOAD1[50]={0xFF,0xFF,0x00,0x00};
+  byte PAYLOAD1[50]={0x01};
+  byte Datatype_Change=0;
+  
+  enum VerbosityLevel
+  {
+    kVERBOSE_OFF = 0,
+    kVERBOSE_ERROR,
+    kVERBOSE_WARNING,
+    kVERBOSE_INFO
+  };
+  
+  enum dhcp_address_state
+  {
+    NOTAVAILABLE,
+    NOTALLOCATED,
+    TIMEDOUT,
+    ALLOCATED
+  };
+  
+  char gAddressStateNames[4][20] = 
+  { 
+    "NOTAVAILABLE",
+    "NOTALLOCATED",
+    "TIMEDOUT",
+    "ALLOCATED"
+  };
+  
+  //
+  // structures
+  //
+  
+  struct dhcp_lease{
+    byte  clientMacId[6];                 // mac id of the dhcp client
+    dword ipAddr;                         // ip address of the lease given by the dhcp server
+    dword mask;                           // mask of the ip address
+    dword time;                           // the lease time 
+    dword router;                         // the router address
+    enum dhcp_address_state addressState; // marking of the current address state
+    dword expirationTime;                 // time when the lease expires
+  };
+  
+  //
+  // constants
+  //
+  const int   kLineLength        = 26;              // number of characters per line in the dhcp servers output console 
+  const int   kMaxLines          = 20;              // maximum lines to display
+  const int   gVerbosity         = kVERBOSE_ERROR;  // the verbosity level
+  const dword kBroadcastIpv4Addr = 0xFFFFFFFF;      // broadcast IP address
+  
+  // 
+  // global variables
+  //  
+  struct  dhcp_lease gLeases[char[]];     // list of all leases
+  dword   gSocket;                        // udp socket opened on port 67 to avoid icmp error messages
+  msTimer gUpdatePanelTimer;              // cyclic timer called every second to update the dhcp servers output console
+  
+   // IP Command Protocol Header Format on Application Layer
+    enum OPTYPE
+  {
+    REQUEST = 0x00,
+    SETREQUEST_NORETURN,
+    SETREQUEST,
+    NOTIFICATION_REQUEST,
+    RESPONSE,
+    NOTIFICATION,
+    NOTIFICATION_CYCLIC,
+    ACK = 0x70,
+    ERROR = 0xE0
+  };
+  byte ACTION_LM;
+  byte PRIO_LM;
+  
+  dword ServiceID;
+  dword OperationID;
+  dword Length;
+  dword SenderHandleID;
+  byte Protocolversion;
+  byte  OpType;
+  byte DataType;
+  byte ProcFlag;
+  byte ErrorCode;
+  word ErrorInfor;
+  //on ethernet
+
+  word length_Packet;
+  byte Tcpbuffer[1500];
+  byte Udpbuffer[1500];
+  word payloadLength;
+  // IP protocol
+  ip_Address DesIPAddress;
+  ip_Address SourceIPAddress;
+  dword SourcePort_SYN;
+  dword DestinationPort_SYN;
+  dword SourcePort_IPLINK;
+  dword DestinationPort_IPLINK;
+  ip_Address SourceIP_LINK;
+  ip_Address DestinationIP_LINK;
+  char TCPConnection[50] = "TcpConnection";
+  char TCPClose[50] = "CloseTcpConnect";
+  char TCPListen[50] = "ListenTcpConnect";
+  char TCPanysignal[50] = "TCP message to transmit any command and control signal!";
+  char UDPanysignal[50] = "UDP message to transmit any command and control signal!";
+  char TCPSYN[50] = "TCPSYN";
+  char TCPSYN_ACK[50] = "TCPSYNACK";
+  char TCPACK[50] = "TCPACK";
+  char TCPRST[50] = "TCPRST";
+  char TCPFIN[50] = "TCPFIN";
+  char Security2702[50]="2702";
+  char Security2706[50]="2706";
+  char Security271A[50]="271A";
+  char IP_LINK[50] = "IPLINK";
+
+  //Parameter DOIp
+  
+  //Timer
+  msTimer IP_LINK_DVR_Timer;
+  msTimer IP_LINK_DMM_Timer;
+  msTimer IP_LINK_VGM_Timer;
+  msTimer IP_LINK_TCAM_Timer;
+  msTimer IP_LINK_DHU_Timer;
+  //Parameter IPLINK
+  byte ReSourceGroup_DVR;
+  byte Priority_DVR;
+  byte ReSourceGroup_TCAM;
+  byte Priority_TCAM;
+  byte ReSourceGroup_DMM;
+  byte Priority_DMM;
+  byte ReSourceGroup_VGM;
+  byte Priority_VGM;
+  byte ReSourceGroup_DHU;
+  byte Priority_DHU;
+  byte sequence_DVR;
+  byte sequence_DMM;
+  byte sequence_VGM;
+  byte sequence_TCAM;
+  byte sequence_DHU;
+  byte sequence_ECU;
+}
+
+on ethernetPacket *
+{
+  dword ipHeaderLength;
+  byte ipProtocol;
+    byte addrAddress[4];  
+  char str[3000];
+  int ret;
+  byte datadoip[1600];
+  byte i = 0;
+  byte seed_buffer[3];
+  byte key_buffer[3] = {0x00, 0x00, 0x00};
+//
+  
+  if(this.dir == rx) return;
+//  this.GetDestinationIPAddress(DesIPAddress);
+//  this.GetSourceIPAddress(SourceIPAddress);
+    addrAddress[0]=this.byte(12);
+    addrAddress[1]=this.byte(13);
+    addrAddress[2]=this.byte(14);
+    addrAddress[3]=this.byte(15);
+    SourceIPAddress.SetAddressAsArray( addrAddress );
+    addrAddress[0]=this.byte(16);
+    addrAddress[1]=this.byte(17);
+    addrAddress[2]=this.byte(18);
+    addrAddress[3]=this.byte(19);
+    DesIPAddress.SetAddressAsArray( addrAddress );
+  if (EcuIp == SourceIPAddress)
+  {
+    switch(this.type)
+    {
+      case 0x0800: // IPv4
+        ipHeaderLength = (this.Byte(0) & 0x0F) * 4;
+        ipProtocol = this.Byte(9);
+        switch(ipProtocol)
+        {
+          case 17:
+          {
+            HandleUDP( this, ipHeaderLength+8, swapWord(this.Word(ipHeaderLength)), swapWord(this.Word(ipHeaderLength+2)) );
+//            payloadLength = this.GetData("udp", "data", Udpbuffer);
+            this.udp.GetData(0, Udpbuffer, this.udp.byteLength);
+            length_Packet = this.udp.byteLength;
+            ByteArray_To_String(Udpbuffer, length_Packet, str);
+           testStep("Callback", "Receive UDP packet with source address %s : %s", EcuIpStr,str);
+            break;
+          } 
+          case 06:
+          {
+            if(this.doip.IsAvailable())
+            {
+              HandleDoIP(this);
+            }
+            else
+            {
+//              payloadLength = this.GetData("tcp", "data", Tcpbuffer);
+              this.tcp.GetData(0, Tcpbuffer, this.tcp.byteLength);
+              length_Packet = this.tcp.byteLength;
+              if(length_Packet==0)
+              {
+                if(this.byte(33)==0x10)
+                {
+                    TestSupplyTextEvent(TCPACK);
+                }
+                else if(this.byte(33)==0x12)
+                {
+                  TestSupplyTextEvent(TCPSYN_ACK);
+                }
+                else if(this.byte(33)==0x02)
+                {
+                  SourcePort_SYN=(this.ipv4.byte(0)<<8)|this.ipv4.byte(1);
+                  DestinationPort_SYN= ((this.ipv4.byte(2)<<8)|this.ipv4.byte(3));
+                  TestSupplyTextEvent(TCPSYN);
+                }
+                else if(this.byte(33)&0x0F==0x03)
+                {
+                  TestSupplyTextEvent(TCPRST);
+                }
+                else if((this.byte(33)&0x0F)==0x01)
+                {
+                  TestSupplyTextEvent(TCPFIN);
+                }
+              }
+              if(length_Packet>0)
+              {
+                ByteArray_To_String(Tcpbuffer, length_Packet, str);
+                testStep("Callback", "Receive TCP packet tcp: %s", str);
+                // Parsing the IP Command header
+                Parsing_PDUheader_IP_Command(Tcpbuffer);
+                // Determine what type of msg base on PDU header of TCP
+                Comparameter_Optype(OpType);
+                TestSupplyTextEvent(TCPanysignal); 
+              }
+            }
+          }
+        }
+
+      break;
+    }
+  }
+//    if(this.IsAvailable("tcp", "data"))
+      
+  for (i = 0; i < 0xFF; ++i)
+  { 
+    if(this.byte(i) == 0x02 && this.byte(i+1) == 0xFD && this.byte(i+2) == 0x80 && this.byte(i+3) == 0x01)
+    {
+      if (this.byte(i+12) == 0x67 && this.byte(i+13) == 0x01)
+      {
+        seed_buffer[0] = this.byte(i+14);
+        seed_buffer[1] = this.byte(i+15);
+        seed_buffer[2] = this.byte(i+16);
+        write ("%x %x %x", seed_buffer[0], seed_buffer[1], seed_buffer[2]);
+        SecurityAccess_Calc_Key_LV1(seed_buffer, 3, key_buffer);
+        write ("%x %x %x", key_buffer[0], key_buffer[1], key_buffer[2]);
+        
+      }
+      if (this.byte(i+12) == 0x67 && this.byte(i+13) == 0x05)
+      {
+        seed_buffer[0] = this.byte(i+14);
+        seed_buffer[1] = this.byte(i+15);
+        seed_buffer[2] = this.byte(i+16);
+        write ("%x %x %x", seed_buffer[0], seed_buffer[1], seed_buffer[2]);
+        SecurityAccess_Calc_Key_LV5(seed_buffer, 3, key_buffer);
+        write ("%x %x %x", key_buffer[0], key_buffer[1], key_buffer[2]);
+        
+      }
+      if (this.byte(i+12) == 0x67 && this.byte(i+13) == 0x19)
+      {
+        seed_buffer[0] = this.byte(i+14);
+        seed_buffer[1] = this.byte(i+15);
+        seed_buffer[2] = this.byte(i+16);
+        write ("%x %x %x", seed_buffer[0], seed_buffer[1], seed_buffer[2]);
+        SecurityAccess_Calc_Key_LV19(seed_buffer, 3, key_buffer);
+        write ("%x %x %x", key_buffer[0], key_buffer[1], key_buffer[2]);
+        
+      }
+      if(this.byte(i+12) == 0x67 && this.byte(i+13) == 0x02)
+      {
+        testSupplyTextEvent(Security2702);
+      }
+       if(this.byte(i+12) == 0x67 && this.byte(i+13) == 0x06)
+      {
+        testSupplyTextEvent(Security2706);
+      }
+       if(this.byte(i+12) == 0x67 && this.byte(i+13) == 0x1A)
+      {
+        testSupplyTextEvent(Security271A);
+      }
+    }
+  }  
+}
+
+void OnTcpConnect(dword socket, long result)
+{ 
+  if(result == 0)
+  {  
+    testSupplyTextEvent(TCPConnection);
+  }  
+}
+
+void OnTcpClose(dword socket, long result)
+{
+  if( socket == CloseSocket)
+  {   
+    testSupplyTextEvent(TCPClose);
+  }
+  
+}
+
+OnTcpListen(dword socket, long result)
+{
+  if(ListenPort==0)
+  {
+    TcpSocket[0] = TcpAccept( socket );
+    testSupplyTextEvent(TCPListen);
+  }
+  else{
+    tcpAbort(socket);
+  }
+  
+}
+on timer Send_501
+{
+  output(NM501);
+  setTimer(Send_501,10);
+}
+on message 0x502
+{
+  TestSupplyTextEvent("ECU_Wakeup_502");
+}
+on timer TesterPresent_Timer
+{
+  SendDianosticMessae(TestLogicAddr, EcuPhyAddr, Req_3E00, TcpSocket[0]);
+  setTimer(TesterPresent_Timer,3000);
+}
+
+on timer IP_LINK_DVR_Timer
+{
+  
+  Send_IPLINK("02:00:00:00:15:14","FF:FF:FF:FF:FF:FF","198.18.37.20","198.18.255.255",0);
+  setTimer(IP_LINK_DVR_Timer,1000);
+}
+on timer IP_LINK_DMM_Timer
+{
+  
+  Send_IPLINK("02:00:00:00:10:12","FF:FF:FF:FF:FF:FF","198.18.32.18","198.18.255.255",1);
+  setTimer(IP_LINK_DMM_Timer,1000);
+}
+on timer IP_LINK_VGM_Timer
+{
+  
+  Send_IPLINK("02:00:00:00:10:01","FF:FF:FF:FF:FF:FF","198.18.32.1","198.18.255.255",2);
+  setTimer(IP_LINK_VGM_Timer,1000);
+}
+on timer IP_LINK_TCAM_Timer
+{
+  
+  Send_IPLINK("02:00:00:00:10:11","FF:FF:FF:FF:FF:FF","198.18.32.17","198.18.255.255",3);
+  setTimer(IP_LINK_TCAM_Timer,1000);
+}
+on timer IP_LINK_DHU_Timer
+{
+  
+  Send_IPLINK("02:00:00:00:10:11","FF:FF:FF:FF:FF:FF","198.18.32.17","198.18.255.255",4);
+  setTimer(IP_LINK_DHU_Timer,1000);
+}
+on preStop
+{
+   stopLogging();
+  setLogFileName("Logging", "MAIN_LOG");
+  startLogging("Logging");
+  stopLogging();
+}
+/// <DoIPReceive>
+export testfunction WaitForTcpClose(long timeout,  enum Bool Sw,  dword SocketId)
+{
+  long rel;
+  CloseSocket = SocketId;
+  if(Sw == kFalse)
+  {
+    rel = testWaitForTextEvent(TCPClose, timeout);
+    if(rel == 0)
+    {
+      testStepPass("WaitForTcpClose", "Tcp socket(0x%x) do not closed by ECU ", SocketId);
+    }
+    else
+    {
+      testStepFail("WaitForTcpClose", "Tcp socket(0x%x) closed by ECU ", SocketId);
+    }
+  }
+  
+  else
+  {
+    
+    rel = testWaitForTextEvent(TCPClose, timeout);
+    if(rel == 1)
+    {
+      testStepPass("WaitForTcpClose", "Tcp socket(0x%x) closed by ECU ", SocketId);
+      
+    }
+    else
+    {
+      testStepFail("WaitForTcpClose", "Tcp socket(0x%x) do not closed by ECU ", SocketId);
+    }  
+  }
+
+}
+
+
+/// <DoIPSend>
+export testfunction EstablishTcpConnection(long timeout, char SrcIp[], dword SrcPort, char DesIp[], dword DesPort)
+{ 
+  long rel;
+  char errorString[100]; 
+  int i;
+  testStep("EstablishTcpConnection","Tester IP (%s), Port(%lu);  ECU IP (%s), Port(%lu)", SrcIp, SrcPort, DesIp, DesPort);  
+  ipAddAdapterAddress(1, ipGetAddressAsNumber(SrcIp), ipGetAddressAsNumber("255.255.255.0"));
+  for(i = 0; i< max; i++)
+  {
+    if(TcpSocket[i] == 0)
+    {
+      break ;
+    }
+  }
+
+  TcpSocket[i] = TcpOpen(ipGetAddressAsNumber(SrcIp), SrcPort);
+  testStep("EstablishTcpConnection","TcpSocket[%d] = 0x%x ", i, TcpSocket[i]);
+  if (TcpSocket[i] == ~0)
+  {
+    TestStepFail("EstablishTcpConnection", "TCP connection established failed");
+    return;
+  }
+  rel = TcpConnect (TcpSocket[i], ipGetAddressAsNumber(DesIp), DesPort);
+  if ((rel == -1) && (ipGetLastSocketError(TcpSocket[i]) != 10035) ) 
+  {
+    IpGetLastSocketErrorAsString(TcpSocket[i], errorString, elcount(errorString) );
+    TestStepFail("EstablishTcpConnection", "TCP connection established failed, %s (Result %d)", errorString,IpGetLastSocketError(TcpSocket[i]) );
+    return;
+  }
+  rel = testWaitForTextEvent(TCPConnection, timeout);
+  if(rel == 1)
+  {
+    testStepPass ("EstablishTcpConnection","TCP connection established successfully");
+    
+  }
+  else
+  {
+    TestStepFail("Establish connection", "TCP connection established failed");
+  }
+}
+/// <DoIPReceive>
+export testfunction WaitForInternalNodeRequestMessage(long timeout, char SrcIp[], dword SrcPort, char DesIp[] , dword DesPort)
+{
+    long rel;
+    char addrData[16];
+    int i;
+     
+    ipAddAdapterAddress(1, ipGetAddressAsNumber(SrcIp), ipGetAddressAsNumber("255.255.0.0"));
+    for(i = 0; i< max; i++)
+    {
+      if(TcpSocket[i] == 0)
+      {
+        break ;
+      }
+    } 
+
+//    gListenSocket = TcpSocket::Open(0, SrcPort);
+    TcpSocket[i] = TcpOpen(ipGetAddressAsNumber(SrcIp), SrcPort);
+//    TcpAbort(TcpSocket[i]);
+    testStep("EstablishTcpConnection","gListenSocket = 0x%x ", TcpSocket[i]);
+    if (TcpListen( TcpSocket[i] ) == 0)
+    {
+      
+        rel = testWaitForTextEvent(TCPListen, timeout);
+      testStep("EstablishTcpConnection","Tester IP (%s), Port(%lu);  ECU IP (%s), Port(%lu)", SrcIp, SrcPort, DesIp,  SourcePort_SYN); 
+        SourceIPAddress.SetAddressAsArray( addrData );
+        if((rel == 1))
+        {
+            testStepPass("WaitForInternalNodeRequestMessage", "Internal node requests to establish TCP_DATA socket with same IP and Port Number"); 
+        }
+        else
+        {
+            testStepFail("WaitForInternalNodeRequestMessage", "Internal node not requests to establish TCP_DATA socket with same IP and Port Number"); 
+        }
+    }
+    else
+    {
+        testStepFail("WaitForInternalNodeRequestMessage", "Internal node not requests to establish TCP_DATA socket"); 
+    }
+}
+
+/// <DoIPReceive>
+export testfunction WaitForVehicleIdentifcationRespMessage(long Timeout)
+{
+  long rel;
+  char str[1500];
+  L4Protocol = kUdp; 
+  memcpy_off(expectdata, 0, VIN, 0, 17);
+  memcpy_off(expectdata, 17, EcuPhyAddr, 0, 2);
+  memcpy_off(expectdata, 19, EID, 0, 6);
+  memcpy_off(expectdata, 25, GID, 0, 6);
+  expectLen = 31;
+  ByteArray_To_String(VIN, 17, str);
+  testStepPass("WaitForVehicleIdentifcationRespMessage", "Expect VIN: %s", str);
+  testStepPass("WaitForVehicleIdentifcationRespMessage", "Expect logic address: 0x%x %x", EcuPhyAddr[0], EcuPhyAddr[1]);
+  ByteArray_To_String(EID, 6, str);
+  testStepPass("WaitForVehicleIdentifcationRespMessage", "Expect EID: %s", str);
+  ByteArray_To_String(GID, 6, str);
+  testStepPass("WaitForVehicleIdentifcationRespMessage", "Expect GID: %s", str);
+  rel = testWaitForTextEvent(vehicileId, Timeout);
+  if(rel == 1)
+  {
+      testStepPass("WaitForVehicleIdentifcationRequestMessage", "ECU send vehicle identifcation response message"); 
+  }
+  else
+  {
+      testStepFail("WaitForVehicleIdentifcationRequestMessage", "ECU not send vehicle identifcation response message"); 
+  } 
+}
+
+/// <DoIPReceive>
+export testfunction WaitForVehicleIdentifcationNoRespMessage(long Timeout)
+{
+  long rel;
+  L4Protocol = kUdp; 
+  rel = testWaitForTextEvent(vehicileId1, Timeout);
+  if(rel == 0)
+  {
+    testStepPass("WaitForVehicleIdentifcationNoRequestMessage", "ECU not send vehicle identifcation response message");
+  }
+  else
+  {
+  testStepFail("WaitForVehicleIdentifcationNoRequestMessage", "Tester receive more vehicle identifcation response message than expected"); 
+  }
+  testStepPass("WaitForVehicleIdentifcationNoRequestMessage", "ECU not send vehicle identifcation response message");
+}
+/// <DoIPReceive>
+export testfunction WaitForAnnouncementMessageRequestMessage(long Timeout)
+{
+    long rel;
+    char str[1500];
+    L4Protocol = kUdp; 
+    memcpy_off(expectdata, 0, VIN, 0, 17);
+    memcpy_off(expectdata, 17, EcuPhyAddr, 0, 2);
+    memcpy_off(expectdata, 19, EID, 0, 6);
+    memcpy_off(expectdata, 25, GID, 0, 6);
+    expectLen = 31;
+    ByteArray_To_String(VIN, 17, str);
+    ByteArray_To_String(EID, 6, str);
+    ByteArray_To_String(GID, 6, str);
+    rel = testWaitForTextEvent(vehicileId1, Timeout);
+    if(rel == 1)
+    {
+      testStepPass("WaitForAnnouncementMessageRequestMessage", "The format of Vehicle Announcement Message correct"); 
+    }
+    else
+    {
+      testStepFail("WaitForAnnouncementMessageRequestMessage", "The format of Vehicle Announcement Message incorrect"); 
+    } 
+}
+/// <DoIPReceive>
+export testfunction WaitForAnnouncementMessageNoRequestMessage(long Timeout)
+{
+    long rel;
+    L4Protocol = kUdp; 
+    rel = testWaitForTextEvent(vehicileId1, Timeout);
+    if(rel == 0)
+    {
+        testStepPass("WaitForAnnouncementMessageNoRequestMessage", "ECU does not send announcement message"); 
+    }
+    else
+    {
+        testStepFail("WaitForAnnouncementMessageNoRequestMessage", "ECU send announcement message"); 
+    }
+}
+
+/// <DoIPReceive>
+export testfunction WaitForDoIPEntityStatusRespMessage(long Timeout)
+{
+  long rel;
+  L4Protocol = kUdp; 
+  expectdata[0] = NodeType;
+  expectdata[1] = MaxSocketNum;
+  expectdata[2] = 0x00;
+  
+  expectLen = 3;
+  rel = testWaitForTextEvent(DoIPEntity, Timeout);
+    testStepPass("WaitForDoIPEntityStatusRespMessage", "Tester receive DoIP Entity Status response message");
+  
+}
+
+/// <DoIPReceive>
+export testfunction WaitForDoIPEntityStatusNoRespMessage(long Timeout)
+{
+  long rel;
+  L4Protocol = kUdp; 
+  expectdata[0] = NodeType;
+  expectdata[1] = MaxSocketNum;
+  expectdata[2] = 0x00;
+  
+  expectLen = 3;
+  rel = testWaitForTextEvent(DoIPEntity, Timeout);
+  if(rel == 0)
+  {
+    testStepPass("WaitForDoIPEntityStatusNoRespMessage", "Tester not receive DoIP Entity Status response message");
+    return;
+  }
+  testStepFail("WaitForDoIPEntityStatusNoRespMessage", "Tester receive DoIP Entity Status response message"); 
+  
+}
+/// <DoIPReceive>
+//Diagnostic power mode information 
+export testfunction WaitForDiagnosticPowerModeInformationRespMessage(long Timeout)
+{
+  long rel;
+  L4Protocol = kUdp; 
+  
+  rel = testWaitForTextEvent(PowerMode, Timeout);
+  if(rel == 1)
+  {
+    testStepPass("WaitForDiagnosticPowerModeInformationRespMessage", "Tester receive Diagnostic power mode information  response message");
+  }
+  else
+  {
+    testStepFail("WaitForDiagnosticPowerModeInformationRespMessage", "ECU not send Diagnostic power mode information  response message");
+  }
+  
+}
+/// <DoIPReceive>
+//Diagnostic power mode information 
+export testfunction WaitForDiagnosticPowerModeInformationNoRespMessage(long Timeout)
+{
+  long rel;
+  L4Protocol = kUdp; 
+  
+  rel = testWaitForTextEvent(PowerMode, Timeout);
+  if(rel == 0)
+  {
+    testStepPass("WaitForDiagnosticPowerModeInformationNoRespMessage", "ECU not send Diagnostic power mode information response message");
+  }
+  else
+  {
+    testStepFail("WaitForDiagnosticPowerModeInformationNoRespMessage", "Tester receive Diagnostic power mode information response message");
+  }
+  
+}
+/// <DoIPReceive>
+//Receive packet test fuction
+export testfunction WaitForRoutingActivationResp(long Timeout, byte SrcAddr[], byte DesAddr[], byte CodeNum )
+{
+  byte reserve[4] = {0x00, 0x00, 0x00, 0x00};
+  long rel;
+  L4Protocol = kTcp; 
+  memcpy_off(expectdata, 0, SrcAddr, 0, 2);
+  memcpy_off(expectdata, 2, DesAddr, 0, 2); 
+  expectdata[4] = CodeNum;
+  expectLen = 5;
+  testStep("WaitForDiagnosticNack", "expect receive routing activation response message: source address(0x%x %x), destination address(0x%x %x), response code(0x%x))", SrcAddr[0], SrcAddr[1], DesAddr[0], DesAddr[1], CodeNum);
+  rel = testWaitForTextEvent(Routresp, Timeout);
+  if(rel == 1)
+  {
+    testStepPass("WaitForRoutingActivationResp", "Tester receive routing activation response from ECU with code 0x%x", CodeNum);
+  }
+  else
+  {
+    testStepFail("WaitForRoutingActivationResp", "ECU not send routing activation response with code 0x%x", CodeNum);
+  }
+}
+
+/// <DoIPReceive>
+//Receive packet test fuction
+export testfunction WaitForRoutingActivationNoResp(long Timeout, byte SrcAddr[], byte DesAddr[], byte CodeNum )
+{
+  byte reserve[4] = {0x00, 0x00, 0x00, 0x00};
+  long rel;
+  L4Protocol = kTcp; 
+  memcpy_off(expectdata, 0, SrcAddr, 0, 2);
+  memcpy_off(expectdata, 2, DesAddr, 0, 2); 
+  expectdata[4] = CodeNum;
+  expectLen = 5;
+  testStep("WaitForDiagnosticNack", "expect receive routing activation response message: source address(0x%x %x), destination address(0x%x %x), response code(0x%x))", SrcAddr[0], SrcAddr[1], DesAddr[0], DesAddr[1], CodeNum);
+  rel = testWaitForTextEvent(Routresp, Timeout);
+  if(rel == 0)
+  {
+    testStepPass("WaitForRoutingActivationNoResp", "ECU not send routing activation response with code 0x%x", CodeNum);
+  }
+  else
+  {
+    testStepFail("WaitForRoutingActivationNoResp", "Tester receive routing activation response from ECU with code 0x%x", CodeNum);
+  }
+}
+
+/// <DoIPReceive>
+export testfunction WaitForDiagnosticMessageResp(long Timeout, byte SrcAddr[], byte DesAddr[], byte UdsData[])
+{
+  long rel;
+  char str[1500]; 
+    int i,j,count;
+    long rel2=0;
+  Result_Resp=0;
+  L4Protocol = kTcp; 
+  memcpy_off(expectdata, 0, SrcAddr, 0, 2);
+  memcpy_off(expectdata, 2, DesAddr, 0, 2); 
+  memcpy_off(expectdata, 4, UdsData, 0,  elCount(UdsData)); 
+  expectLen = 4 + elCount(UdsData);
+  ByteArray_To_String(expectdata, expectLen, str);
+  testStep("WaitForDiagnosticMessageResp", "Expect receive diagnostic message: %s", str);
+  count=elCount(UdsData);
+  rel = testWaitForTextEvent(Diagmsg, Timeout);
+  if(rel == 1)
+  {
+    
+	while(datadoip[12]==0x7F && datadoip[14] ==0x78)
+	{
+		rel=0;
+		rel = testWaitForTextEvent(Diagmsg, 5000);
+	}
+
+    if(rel == 1)
+    {
+      for(i=0;i<count;i++)
+      {
+          if(datadoip[12+i]==UdsData[i])
+          {
+              rel2=1;
+          }
+          else
+          {
+              rel2=0;
+              break;
+          }
+      }
+      if(rel2==1)
+      {
+        testStepPass("WaitForDiagnosticMessageResp", "Tester receive diagnostic message as expected message from ECU ");  
+        Result_Resp=1;
+      }
+      else
+      testStepFail("WaitForDiagnosticMessageResp", "Tester receive diagnostic message different expected message from ECU "); 
+    }
+    else
+    {
+      testStepFail("WaitForDiagnosticMessageResp", "ECU not send diagnostic message after 7F %x 78",datadoip[13]);
+    }
+    
+  }
+  else
+  {
+    testStepFail("WaitForDiagnosticMessageResp", "ECU not send diagnostic message ");
+  }  
+
+}
+/// <DoIPReceive>
+export testfunction WaitForDiagnosticMessageNoResp(long Timeout, byte SrcAddr[], byte DesAddr[], byte UdsData[])
+{
+  long rel;
+  char str[1500]; 
+  L4Protocol = kTcp; 
+  memcpy_off(expectdata, 0, SrcAddr, 0, 2);
+  memcpy_off(expectdata, 2, DesAddr, 0, 2); 
+  memcpy_off(expectdata, 4, UdsData, 0,  elCount(UdsData)); 
+  expectLen = 4 + elCount(UdsData);
+  ByteArray_To_String(expectdata, expectLen, str);
+  testStep("WaitForDiagnosticMessageResp", "Expect receive diagnostic message: %s", str);
+  rel = testWaitForTextEvent(Diagmsg, Timeout);
+  if(rel == 0)
+  {
+    testStepPass("WaitForDiagnosticMessageNoResp", "ECU not send diagnostic message ");
+  }
+  else
+  {
+    testStepFail("WaitForDiagnosticMessageNoResp", "Tester receive diagnostic message from ECU "); 
+  }  
+  
+}
+/// <DoIPReceive>
+export testfunction WaitForDiagnosticAck(long Timeout, byte SrcAddr[], byte DesAddr[])
+{
+  long rel;
+  L4Protocol = kTcp; 
+  memcpy_off(expectdata, 0, SrcAddr, 0, 2);
+  memcpy_off(expectdata, 2, DesAddr, 0, 2); 
+  expectLen = 4;
+  rel = testWaitForTextEvent(Diagackmsg, Timeout);
+  if(rel == 1)
+  {
+    testStepPass("WaitForDiagnosticAck", "Tester receive diagnostic ack message from ECU");
+  }
+  else
+  {
+    testStepFail("WaitForDiagnosticAck", "ECU not send diagnostic ack message ");
+  }
+  
+}
+
+/// <DoIPReceive>
+export testfunction WaitForDiagnosticNack(long Timeout, byte SrcAddr[], byte DesAddr[], byte NackCode)
+{
+  long rel;
+  L4Protocol = kTcp; 
+  memcpy_off(expectdata, 0, SrcAddr, 0, 2);
+  memcpy_off(expectdata, 2, DesAddr, 0, 2); 
+  expectdata[4] = NackCode;
+  expectLen = 5;
+  testStep("WaitForDiagnosticNack", "expect receive diagnostic nack message: source address(0x%x %x), destination address(0x%x %x), nack code(0x%x))", SrcAddr[0], SrcAddr[1], DesAddr[0], DesAddr[1], NackCode);
+  rel = testWaitForTextEvent(Diagnackmsg, Timeout);
+  if(rel == 1)
+  {
+    testStepPass("WaitForDiagnosticNack", "Tester receive diagnostic nack message with nack code 0x%x", NackCode);
+  }
+  else
+  {
+    testStepFail("WaitForDiagnosticNack", "ECU not diagnostic nack messagee with nackcode code 0x%x", NackCode);
+  }
+}
+
+/// <DoIPReceive>
+export testfunction WaitForAliveCheckReq(long Timeout)
+{
+  
+  long rel;
+  L4Protocol = kTcp; 
+  rel = testWaitForTextEvent(AliveCheck, Timeout);
+  if(rel == 1)
+  {
+    testStepPass("WaitForAliveCheckReq", "Tester receive alive check request from ECU with code 0x10");
+  }
+  else
+  {
+    testStepFail("WaitForAliveCheckReq", "ECU not send alive check request");
+  }
+  
+}
+
+/// <DoIPReceive>
+export testfunction waitForDoipHeaderNack(long Timeout, byte NackCode, enum TransportFiltre Protocol )
+{ 
+  long rel;
+  L4Protocol = Protocol;
+  expectdata[0] = NackCode;
+  expectLen = 1;
+  rel = testWaitForTextEvent(HeaderNack, Timeout);
+  if(rel == 0)
+  {
+    testStepPass("waitForDoipHeaderNack", "Tester receive generic DoIP header Nack message from ECU with code 0x%x", NackCode);
+  }
+  else
+  {
+    testStepFail("waitForDoipHeaderNack", "ECU not send generic DoIP header Nack message wich code 0x%x", NackCode);
+  }
+}
+/// <DoIPReceive>
+export testfunction waitForPayloadTypeF002(long Timeout, byte PayloadType[], enum TransportFiltre Protocol )
+{ 
+  long rel;
+  L4Protocol = Protocol;
+  rel = testWaitForTextEvent(PayloadTypeF002, Timeout);
+  if(rel == 1)
+  {
+    testStepPass("waitForPayloadType", "Tester receive generic DoIP header message from ECU with code 0xF002");
+  }
+  else
+  {
+    testStepFail("waitForPayloadType", "ECU not send generic DoIP header  message wich code");
+  }
+}
+/// <DoIPReceive>
+export testfunction waitForPayloadTypeF005(long Timeout, byte PayloadType[], enum TransportFiltre Protocol )
+{ 
+  long rel;
+  L4Protocol = Protocol;
+  rel = testWaitForTextEvent(PayloadTypeF005, Timeout);
+  if(rel == 1)
+  {
+    testStepPass("waitForPayloadType", "Tester receive generic DoIP header  message from ECU with code 0xF005");
+  }
+  else
+  {
+    testStepFail("waitForPayloadType", "ECU not send generic DoIP header  message wich code");
+  }
+}
+/// <DoIPReceive>
+export testfunction waitForPayloadTypeF007(long Timeout, byte PayloadType[], enum TransportFiltre Protocol )
+{ 
+  long rel;
+  L4Protocol = Protocol;
+  rel = testWaitForTextEvent(PayloadTypeF007, Timeout);
+  if(rel == 1)
+  {
+    testStepPass("waitForPayloadType", "Tester receive generic DoIP header  message from ECU with code 0xF007");
+  }
+  else
+  {
+    testStepFail("waitForPayloadType", "ECU not send generic DoIP header  message wich code");
+  }
+}
+
+void HandleDoIP(ethernetPacket * pkt)
+{
+  
+//  byte datadoip[1500];
+//  char str[1500];
+  int i;
+  lendoip = pkt.doip.byteLength;
+  pkt.tcp.GetData(0, datadoip, pkt.doip.byteLength);
+  ByteArray_To_String(datadoip, lendoip, str_DOIP_packet);
+  testStep("Callback", "Receive DoIP packet %d: %s",lendoip, str_DOIP_packet);
+  CompareParameters_DoIP( datadoip, lendoip);
+  for(i=12;i<lendoip;i++)
+  {
+    UDS_Data[i-12]=datadoip[i];
+  }
+  testSupplyTextEvent(Diagmsg);
+}
+void CompareParameters_DoIP(byte data[], dword length)
+{
+  word msgType;
+  int rel;
+  byte payload[1500];
+  msgType = (dword)(data[2]<<8) + (dword)( data[3]);
+  
+  if(msgType == 0x8001) //Diagnostic message
+  {
+    memcpy_off(payload, 0, data, 8, length);
+    if(memcmp(payload, expectdata, expectLen)==0)
+//      testSupplyTextEvent(Diagmsg);
+    return;
+  }
+ 
+  if(msgType == 0x8002) //Diagnostic message positive acknowledgement
+  {
+    if(data[12] !=0)
+      testStep("CompareParameters", "Diagnost ack message with ack code is 0x%x", data[12]);
+    testSupplyTextEvent(Diagackmsg);
+    return;
+  }
+  
+  if(msgType== 0x8003) //Diagnostic message negative acknowledgement
+  {
+    memcpy_off(payload, 0, data, 8, length);
+    if(memcmp(payload, expectdata, expectLen)==0)
+      testSupplyTextEvent(Diagnackmsg);
+    return;
+  }
+  
+  if(msgType == 0x07) //Alive check request
+  {
+    testSupplyTextEvent(AliveCheck);
+    return;
+  }
+  
+  if(msgType == 0x00) //Generic DoIP header negative acknowledge
+  {
+    memcpy_off(payload, 0, data, 8, length);
+    if(memcmp(payload, expectdata, expectLen)==0)
+      testSupplyTextEvent(HeaderNack);
+    return;
+  }
+  
+  if(msgType == 0xF002) //F0002
+  {
+      testSupplyTextEvent(PayloadTypeF002);
+    return;
+  }
+  if(msgType == 0xF005) //F0005
+  {
+      testSupplyTextEvent(PayloadTypeF005);
+    return;
+  }
+  if(msgType == 0xF007) //F0007
+  {
+      testSupplyTextEvent(PayloadTypeF007);
+    return;
+  }
+   if(msgType == 0x06) //Routing activation response
+  {
+    memcpy_off(payload, 0, data, 8, length);
+    if(memcmp(payload, expectdata, expectLen)==0)
+      testSupplyTextEvent(Routresp);
+    return;
+  }
+  
+  if(msgType == 0x04)  //Vehicle announcement message
+  {
+    testSupplyTextEvent(vehicileId1);
+    memcpy_off(payload, 0, data, 8, length);
+    if(memcmp(payload, expectdata, expectLen)==0)
+      testSupplyTextEvent(vehicileId);
+    return;
+  }
+  if(msgType == 0x4002) //DoIP entity status response
+  {
+    testSupplyTextEvent(vehicileId1);
+    memcpy_off(payload, 0, data, 8, length);
+    if(memcmp(payload, expectdata, expectLen)==0)
+      testSupplyTextEvent(DoIPEntity);
+    return;
+  }
+ 
+  if(msgType == 0x4004) //Diagnostic power mode information response
+  {
+    testSupplyTextEvent(PowerMode);
+    return;
+  }
+}
+void Comparameter_Optype(byte OperationType)
+{
+  switch(OperationType)
+  {
+    case 0x00:
+    {
+      testSupplyTextEvent("REQUEST");
+      break;  
+    }
+    case 0x01:
+    {
+      testSupplyTextEvent("SETREQUEST_NORETURN"); 
+      break;  
+    }
+    case 0x02:
+    {
+      testSupplyTextEvent("SETREQUEST"); 
+      break;  
+    }    
+    case 0x03:
+    {
+      testSupplyTextEvent("NOTIFICATION_REQUEST");  
+      break;  
+    }
+    case 0x04:
+    {
+      testSupplyTextEvent("RESPONSE");  
+      break;  
+    } 
+    case 0x05:
+    {
+      testSupplyTextEvent("NOTIFICATION"); 
+      break;  
+    } 
+    case 0x06:
+    {
+      testSupplyTextEvent("NOTIFICATION_CYCLIC");  
+      break;  
+    } 
+    case 0x70:
+    {
+      testSupplyTextEvent("ACK");  
+      break;  
+    } 
+    case 0xE0:
+    {
+      testSupplyTextEvent("ERROR"); 
+      break;  
+    } 
+    default:
+    {
+      testSupplyTextEvent("Operation Undefined");
+      break;
+    }
+  }
+}
+void HandleUDP( ethernetPacket * pkt, word udpDataOffset, word srcPort, word dstPort )
+{
+  word length;
+  int ret;
+  byte addrAddress[4];  
+   SourcePort_IPLINK=(pkt.ipv4.byte(0)<<8)|pkt.ipv4.byte(1);
+   DestinationPort_IPLINK= ((pkt.ipv4.byte(2)<<8)|pkt.ipv4.byte(3));
+
+  if(DestinationPort_IPLINK ==50001)
+  {
+//    ret = pkt.GetDestinationIPAddress(DestinationIP_LINK);
+//    ret = pkt.GetSourceIPAddress(SourceIP_LINK);
+        addrAddress[0]=pkt.byte(12);
+    addrAddress[1]=pkt.byte(13);
+    addrAddress[2]=pkt.byte(14);
+    addrAddress[3]=pkt.byte(15);
+    SourceIP_LINK.SetAddressAsArray( addrAddress );
+    addrAddress[0]=pkt.byte(16);
+    addrAddress[1]=pkt.byte(17);
+    addrAddress[2]=pkt.byte(18);
+    addrAddress[3]=pkt.byte(19);
+    DestinationIP_LINK.SetAddressAsArray( addrAddress );
+    length = pkt.GetData( udpDataOffset, Udpbuffer, elcount(Udpbuffer)-1 );
+    Udpbuffer[length] = 0; // terminating zero for strings
+    // Parsing the IP LINK
+    Parsing_PDUheader_IP_LINK(Udpbuffer); 
+
+ 
+
+
+  }
+  else
+  {
+    length = pkt.GetData( udpDataOffset, Udpbuffer, elcount(Udpbuffer)-1 );
+    Udpbuffer[length] = 0; // terminating zero for strings
+    // Parsing the IP Command header
+    Parsing_PDUheader_IP_Command(Udpbuffer); 
+    // Determine what type of msg base on PDU header of UDP
+    Comparameter_Optype(OpType); 
+    TestSupplyTextEvent(UDPanysignal);
+    
+  }
+
+}
+void Parsing_PDUheader_IP_LINK(byte buffer[])
+{
+
+    ServiceID       = (Udpbuffer[0] << 8) | Udpbuffer[1];  
+    OperationID     = (Udpbuffer[2] << 8) | Udpbuffer[3];
+    Length          = (Udpbuffer[4] << 24) | (Udpbuffer[5] << 16) | (Udpbuffer[6] << 8) | Udpbuffer[7];
+    SenderHandleID  = (Udpbuffer[8] << 24) | (Udpbuffer[9] << 16) | (Udpbuffer[10] << 8) | Udpbuffer[11];
+    sequence_ECU=Udpbuffer[11];
+    Protocolversion = Udpbuffer[12];
+    OpType          = Udpbuffer[13];
+    DataType        = Udpbuffer[14];
+    ProcFlag        = (Udpbuffer[15] & 0x8) >> 7;
+    // Link Manager Message
+    ACTION_LM       = Udpbuffer[16];
+    PRIO_LM         = Udpbuffer[17];
+    TestSupplyTextEvent(IP_LINK);
+  
+}
+void Parsing_PDUheader_IP_Command(byte buffer[])
+{
+  // Parsing the IP Command header
+  ServiceID       = (buffer[0] << 8) | buffer[1];  
+  OperationID     = (buffer[2] << 8) | buffer[3];
+  Length          = (buffer[4] << 24) | (buffer[5] << 16) | (buffer[6] << 8) | buffer[7];
+  SenderHandleID  = (buffer[8] << 24) | (buffer[9] << 16) | (buffer[10] << 8) | buffer[11];
+  Protocolversion = buffer[12];
+  OpType          = buffer[13];
+  DataType        = buffer[14];
+  ProcFlag        = (buffer[15] & 0x8) >> 7;
+  ErrorCode       = buffer[16];
+  ErrorInfor      = (buffer[17] << 8) | buffer[18];
+  
+}
+
+
+
+
+/// <DoIPReceive>
+export testfunction waitForDHCPDiscover(long Timeout,  enum Bool Sw )
+{ 
+  long rel;
+  if(Sw == kFalse)
+  {
+    rel = testWaitForTextEvent(DhcpType, Timeout);
+    if(rel == 1)
+    {
+        testStepPass("waitForDHCPDiscover", "The Edge Node sends DHCP_DISCOVER message");
+    }
+    else
+    {
+        testStepFail("waitForDHCPDiscover", "The Edge Node not sends DHCP_DISCOVER message");
+    }
+  }
+  else
+  {
+    rel = testWaitForTextEvent(DhcpType, Timeout);
+    if(rel == 0)
+    {
+        testStepPass("waitForDHCPDiscover", "The Edge Node not sends DHCP_DISCOVER message");
+    }
+    else
+    {
+        testStepFail("waitForDHCPDiscover", "The Edge Node sends DHCP_DISCOVER message");
+    }
+  }
+}
+/// <DoIPSend>
+//Send packet test fuction
+export testfunction  SendRoutingActivationReq_Ethernet()
+{
+   ICMMsg.Clear();
+  ICMMsg.source = EthGetMacAddressAsNumber( "02:00:00:00:10:01" );
+  
+//  ICMMsg.destination = EthGetMacAddressAsNumber( "02:C4:46:18:1E:00" );
+  ICMMsg.destination = EthGetMacAddressAsNumber( "02:00:00:00:14:60" );
+  ICMMsg.ipv4.init();  
+
+  ICMMsg.ipv4.source.ParseAddress("198.18.32.1");
+  
+  ICMMsg.ipv4.destination.ParseAddress("198.18.36.96");
+//  ICMMsg.ipv4.destination.ParseAddress("192.168.1.2");
+  
+  ICMMsg.tcp.Init();   
+  
+  ICMMsg.tcp.source = 13400;
+  ICMMsg.tcp.destination = 13400;
+  ICMMsg.byte(40) = 0x02;//service id
+  ICMMsg.byte(41) = 0xFD;//service id
+  
+  ICMMsg.byte(42) = 0x00;//operation id
+  ICMMsg.byte(43) = 0x05;//operation id
+
+  ICMMsg.byte(44) = 0;
+  ICMMsg.byte(45) = 0;
+  ICMMsg.byte(46) = 0;
+  ICMMsg.byte(47) = 7;
+ICMMsg.byte(48) = TestLogicAddr[0];
+ICMMsg.byte(49) = TestLogicAddr[1];
+ICMMsg.byte(50) = 0;
+
+  ICMMsg.byte(51) = 0;
+  ICMMsg.byte(52) = 0;
+  ICMMsg.byte(53) = 0;
+  ICMMsg.byte(54) = 0;
+  ICMMsg.byte(55) = 0xFF;
+  ICMMsg.byte(56) = 0xFF;
+ICMMsg.byte(57) = 0xFF;
+ICMMsg.byte(58) = 0xFF;
+  
+  ICMMsg.Length = 59;
+  ICMMsg.CompletePacket();
+}
+/// <DoIPSend>
+//Send packet test fuction
+export testfunction  SendRoutingActivationReq(byte SrcLogicAddr[], byte ActivationType, dword SocketId)
+{
+  long rel;
+  char err_String[100]; 
+  char str[1500];
+  TxPktData[0] = 0x02;
+  TxPktData[1] = 0xFD;
+  TxPktData[2] = 0x00;
+  TxPktData[3] = 0x05;
+  TxPktData[4] = 0x00;
+  TxPktData[5] = 0x00;
+  TxPktData[6] = 0x00;
+  TxPktData[7] = 0x07;
+  TxPktData[8] = SrcLogicAddr[0];
+  TxPktData[9] = SrcLogicAddr[1];
+  TxPktData[10] = ActivationType;
+  TxPktData[11] = TxPktData[12] = TxPktData[13] = TxPktData[14] = 0x00;
+  TxPktData[15] = TxPktData[16] = TxPktData[17] = TxPktData[18] = 0xFF;
+  
+  rel = tcpSend(SocketId, TxPktData, 15);
+  if (rel == 0)
+  { 
+    ByteArray_To_String(TxPktData, 15, str);
+    TestSteppass ("sendRoutingActivationReq"," Tester send routing activation request: %s", str);
+  }
+ else if ((rel == -1) && (IpGetLastSocketError(SocketId)== 997))
+  {
+    ByteArray_To_String(TxPktData, 15, str);
+    TestSteppass ("sendRoutingActivationReq"," Tester send routing activation request: %s", str);
+  }
+  else
+  {
+    IpGetLastSocketErrorAsString( SocketId, err_String, elcount(err_String));
+    TestStepFail("sendRoutingActivationReq", " Tester sended Routing Activation Request failed with result %d (%s)", IpGetLastSocketError(SocketId), err_String ); 
+  }
+}
+/// <DoIPSend>
+export testfunction  SendEthernet_VehicleIdentifcationRequestMessage()
+{
+  ethernetPacket IPLMMsg;
+  IPLMMsg.Clear();
+  IPLMMsg.source = EthGetMacAddressAsNumber( "02:84:CF:3B:BE:00" );
+  
+  IPLMMsg.destination = EthGetMacAddressAsNumber( "FF:FF:FF:FF:FF:FF" );
+
+  IPLMMsg.ipv4.init();  
+
+  IPLMMsg.ipv4.source.ParseAddress("198.18.32.8");
+  
+  IPLMMsg.ipv4.destination.ParseAddress("255.255.255.255");
+
+  
+  IPLMMsg.udp.Init();   
+  
+  IPLMMsg.udp.source = 13400;
+  
+  IPLMMsg.udp.destination = 13400;
+  
+  IPLMMsg.SetVlanId(6);
+  IPLMMsg.SetVlanPriority(7);
+  IPLMMsg.byte(28) = 0xFF;//service id
+  IPLMMsg.byte(29) = 0x00;//service id
+  
+  IPLMMsg.byte(30) = 0x01;//operation id
+  IPLMMsg.byte(31) = 0x00;//operation id
+  
+  IPLMMsg.byte(32) = 0x00;//length
+  IPLMMsg.byte(33) = 0x00;//length
+  IPLMMsg.byte(34) = 0x00;//length
+
+//  IPLMMsg.byte(28) = 0x02;//service id
+//  IPLMMsg.byte(29) = 0xFD;//service id
+  
+//  IPLMMsg.byte(30) = 0x00;//operation id
+//  IPLMMsg.byte(31) = 0x05;//operation id
+  
+//  IPLMMsg.byte(32) = 0x00;//length
+//  IPLMMsg.byte(33) = 0x00;//length
+//  IPLMMsg.byte(34) = 0x00;//length
+//  IPLMMsg.byte(35) = 0x07;//length byte of payload
+  
+//  //SenderHandleID
+//  IPLMMsg.byte(36) = 0x0E;//service id
+//  IPLMMsg.byte(37) = 0x80;//operation id
+//  IPLMMsg.byte(38) = 0x00;//Operation Type
+//  IPLMMsg.byte(39) = 0x00;//SeqNr
+  
+//  IPLMMsg.byte(40) = 0x00; //Protocol version 
+  
+//  IPLMMsg.byte(41) = 0x00; //Operation Type
+  
+//  IPLMMsg.byte(42) = 0x00; //Data type
+  
+  
+  IPLMMsg.Length = 35;
+  IPLMMsg.CompletePacket();
+  
+  output(IPLMMsg);
+   
+
+}
+/// <DoIPSend>
+export testfunction  SendDianosticMessae_Ethernet( byte UdsData[])
+{
+    long rel;
+  char err_String[100], str[1500];
+  dword len;
+  len = elCount(UdsData) + 4;
+    ICMMsg.Clear();
+  ICMMsg.source = EthGetMacAddressAsNumber( "02:00:00:00:10:01" );
+  
+//  ICMMsg.destination = EthGetMacAddressAsNumber( "02:C4:46:18:1E:00" );
+  ICMMsg.destination = EthGetMacAddressAsNumber( "02:00:00:00:14:60" );
+  ICMMsg.ipv4.init();  
+
+  ICMMsg.ipv4.source.ParseAddress("198.18.32.1");
+  
+  ICMMsg.ipv4.destination.ParseAddress("198.18.36.96");
+//  ICMMsg.ipv4.destination.ParseAddress("192.168.1.2");
+  
+  ICMMsg.tcp.Init();   
+  
+  ICMMsg.tcp.source = 13400;
+  ICMMsg.tcp.destination = 13400;
+  ICMMsg.byte(40) = 0x02;//service id
+  ICMMsg.byte(41) = 0xFD;//service id
+  
+  ICMMsg.byte(42) = 0x80;//operation id
+  ICMMsg.byte(43) = 0x01;//operation id
+
+  ICMMsg.byte(44) = (byte)(len >>24);
+  ICMMsg.byte(45) = (byte)(len >>16);
+  ICMMsg.byte(46) = (byte)(len >>8);
+  ICMMsg.byte(47) = (byte)(len >>0);
+ICMMsg.byte(48) = TestLogicAddr[0];
+ICMMsg.byte(49) = TestLogicAddr[1];
+ICMMsg.byte(50) = EcuPhyAddr[0];
+ICMMsg.byte(51) = EcuPhyAddr[1];
+  
+  memcpy_off(TxPktData, 52, UdsData, 0, elCount(UdsData)); 
+
+  
+  ICMMsg.Length = 51+elCount(UdsData);
+  ICMMsg.CompletePacket();
+  
+  output(ICMMsg);
+}
+/// <DoIPSend>
+export testfunction  SendDianosticMessae(byte SrcLogicAddr[], byte TarLogicAddr[], byte UdsData[], dword SocketId)
+{
+  long rel;
+  char err_String[100], str[1500];
+  dword len;
+  len = elCount(UdsData) + 4;
+  TxPktData[0] = 0x02;
+  TxPktData[1] = 0xFD;
+  TxPktData[2] = 0x80;
+  TxPktData[3] = 0x01;
+  TxPktData[4] = (byte)(len >>24);
+  TxPktData[5] = (byte)(len >>16);
+  TxPktData[6] = (byte)(len >>8);
+  TxPktData[7] = (byte)(len >>0);
+  TxPktData[8] = SrcLogicAddr[0];
+  TxPktData[9] = SrcLogicAddr[1]; 
+  TxPktData[10] = TarLogicAddr[0];
+  TxPktData[11] = TarLogicAddr[1];
+  memcpy_off(TxPktData, 12, UdsData, 0, elCount(UdsData));  
+  rel = tcpSend(SocketId, TxPktData, elCount(UdsData)+ 12 );
+  if (rel == 0)
+  { 
+    ByteArray_To_String(TxPktData, elCount(UdsData)+ 12, str);
+    TestSteppass ("SendDianosticMessae"," Tester send Diagnostic Message: %s", str);
+    
+  }
+ else if ((rel == -1) && (IpGetLastSocketError(SocketId)== 997))
+  {
+    ByteArray_To_String(TxPktData, elCount(UdsData)+ 12, str);
+    TestSteppass ("SendDianosticMessae"," Tester send Diagnostic Message: %s", str);
+  }
+  else
+  {
+    IpGetLastSocketErrorAsString( SocketId, err_String, elcount(err_String));
+    TestStepFail("SendDianosticMessae", " Tester sended Diagnostic Message failed with result %d (%s)", IpGetLastSocketError(SocketId), err_String ); 
+  } 
+}
+
+/// <DoIPSend>
+export testfunction  SendDianosticMessaeTC27791(byte SrcLogicAddr[], byte TarLogicAddr[], byte UdsData[], dword SocketId)
+{
+  long rel;
+  char err_String[100], str[1500];
+  dword len;
+  len = elCount(UdsData) + 4;
+  TxPktData[0] = 0x00;
+  TxPktData[1] = 0x00;
+  TxPktData[2] = 0x80;
+  TxPktData[3] = 0x01;
+  TxPktData[4] = (byte)(len >>24);
+  TxPktData[5] = (byte)(len >>16);
+  TxPktData[6] = (byte)(len >>8);
+  TxPktData[7] = (byte)(len >>0);
+  TxPktData[8] = SrcLogicAddr[0];
+  TxPktData[9] = SrcLogicAddr[1]; 
+  TxPktData[10] = TarLogicAddr[0];
+  TxPktData[11] = TarLogicAddr[1];
+  memcpy_off(TxPktData, 12, UdsData, 0, elCount(UdsData));  
+  rel = tcpSend(SocketId, TxPktData, elCount(UdsData)+ 12 );
+  if (rel == 0)
+  { 
+    ByteArray_To_String(TxPktData, elCount(UdsData)+ 12, str);
+    TestSteppass ("SendDianosticMessae"," Tester send Diagnostic Message: %s", str);
+    
+  }
+ else if ((rel == -1) && (IpGetLastSocketError(SocketId)== 997))
+  {
+    ByteArray_To_String(TxPktData, elCount(UdsData)+ 12, str);
+    TestSteppass ("SendDianosticMessae"," Tester send Diagnostic Message: %s", str);
+  }
+  else
+  {
+    IpGetLastSocketErrorAsString( SocketId, err_String, elcount(err_String));
+    TestStepFail("SendDianosticMessae", " Tester sended Diagnostic Message failed with result %d (%s)", IpGetLastSocketError(SocketId), err_String ); 
+  } 
+}
+/// <DoIPSend>
+export testfunction  SendTcpDoIPMessae(byte ProVer, byte InverseVer, word msgtype, dword Len, byte payloaddata[], dword SocketId)
+{
+  long rel;
+  char err_String[100];
+  char str[1500];
+  TxPktData[0] = ProVer;
+  TxPktData[1] = InverseVer;
+  TxPktData[2] = (byte)(msgtype>>8);
+  TxPktData[3] = (byte)(msgtype);
+  TxPktData[4] = (byte)(Len >> 24 );
+  TxPktData[5] = (byte)(Len >> 16 );
+  TxPktData[6] = (byte)(Len >> 8 );
+  TxPktData[7] = (byte)(Len );
+  write("%02X, %02X ", TxPktData[2],TxPktData[3]);
+  
+  memcpy_off(TxPktData, 8, payloaddata, 0, elCount(payloaddata));
+ 
+  rel = tcpSend(SocketId, TxPktData, elCount(payloaddata) +8 );
+  if (rel == 0)
+  { 
+    if(elCount(payloaddata)<100)
+    {
+      ByteArray_To_String(TxPktData, elCount(payloaddata) +8, str);
+    }
+    
+    TestSteppass ("SendWrongDianosticMessae","Tester send DoIP message by TCP: %s", str);
+  }
+ else if ((rel == -1) && (IpGetLastSocketError(SocketId)== 997))
+  {
+    TestSteppass ("SendWrongDianosticMessae","Tester send DoIP message by TCP with 997: %s", str);
+  }
+  else
+  {
+    IpGetLastSocketErrorAsString( SocketId, err_String, elcount(err_String));
+    TestStepFail("SendWrongDianosticMessae", " Tester send DoIP message by TCP failed with result %d (%s)", IpGetLastSocketError(SocketId), err_String ); 
+  }
+}
+
+/// <DoIPSend>
+export testfunction  SendTcpDoIPMessae1(byte ProVer, byte InverseVer, word msgtype, dword Len, byte SrcLogicAddr[], byte ActivationType, dword SocketId)
+{
+  long rel;
+  char err_String[100]; 
+  char str[1500];
+  TxPktData[0] = ProVer;
+  TxPktData[1] = InverseVer;
+  TxPktData[2] = (byte)(msgtype>>8);
+  TxPktData[3] = (byte)(msgtype);
+  TxPktData[4] = (byte)(Len >> 24 );
+  TxPktData[5] = (byte)(Len >> 16 );
+  TxPktData[6] = (byte)(Len >> 8 );
+  TxPktData[7] = (byte)(Len );
+  TxPktData[8] = SrcLogicAddr[0];
+  TxPktData[9] = SrcLogicAddr[1];
+  TxPktData[10] = ActivationType;
+  TxPktData[11] = TxPktData[12] = TxPktData[13] = TxPktData[14] = 0x00;
+  TxPktData[15] = TxPktData[16] = TxPktData[17] = TxPktData[18] = 0xFF;
+  
+  rel = tcpSend(SocketId, TxPktData, 19);
+  if (rel == 0)
+  { 
+    ByteArray_To_String(TxPktData, 19, str);
+    TestSteppass ("sendRoutingActivationReq"," Tester send routing activation request: %s", str);
+  }
+ else if ((rel == -1) && (IpGetLastSocketError(SocketId)== 997))
+  {
+    ByteArray_To_String(TxPktData, 19, str);
+    TestSteppass ("sendRoutingActivationReq"," Tester send routing activation request: %s", str);
+  }
+  else
+  {
+    IpGetLastSocketErrorAsString( SocketId, err_String, elcount(err_String));
+    TestStepFail("sendRoutingActivationReq", " Tester sended Routing Activation Request failed with result %d (%s)", IpGetLastSocketError(SocketId), err_String ); 
+  }
+}
+
+
+/// <DoIPSend>
+export testfunction  SendTcpDoIPMessae(byte ProVer, byte InverseVer, word msgtype, dword Len, byte payloaddata[], dword payLen, dword SocketId)
+{
+  long rel;
+  char err_String[100];
+  char str[1500];
+  TxPktData[0] = ProVer;
+  TxPktData[1] = InverseVer;
+  TxPktData[2] = (byte)(msgtype>>8);
+  TxPktData[3] = (byte)(msgtype);
+  TxPktData[4] = (byte)(Len >> 24 );
+  TxPktData[5] = (byte)(Len >> 16 );
+  TxPktData[6] = (byte)(Len >> 8 );
+  TxPktData[7] = (byte)(Len );
+  write("%02X, %02X ", TxPktData[2],TxPktData[3]);
+  memcpy_off(TxPktData, 8, payloaddata, 0, payLen);
+//  memcpy_off(TxPktData, 8, payloaddata, 0, elCount(payloaddata));
+  write("payLen +8 = %d,%d",payLen +8,elCount(TxPktData));
+  rel = tcpSend(SocketId, TxPktData, payLen +8);
+  if (rel == 0)
+  { 
+//    if(elCount(payloaddata)<100)
+//    {
+//      ByteArray_To_String(TxPktData, elCount(payLen) +8, str);
+//    }
+
+    TestSteppass ("SendWrongDianosticMessae","Tester send DoIP message by TCP: %s", str);
+  }
+ else if ((rel == -1) && (IpGetLastSocketError(SocketId)== 997))
+  {
+    TestSteppass ("SendWrongDianosticMessae","Tester send DoIP message by TCP with 997: %s", str);
+  }
+  else
+  {
+    IpGetLastSocketErrorAsString( SocketId, err_String, elcount(err_String));
+    TestStepFail("SendWrongDianosticMessae", " Tester send DoIP message by TCP failed with result %d (%s)", IpGetLastSocketError(SocketId), err_String ); 
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/// <DoIPSend>
+export testfunction  SendTcpDoIPMessae(byte ProVer, byte InverseVer, word msgtype, dword Len, dword SocketId)
+{
+  long rel;
+  char err_String[100];
+  char str[1500];
+  TxPktData[0] = ProVer;
+  TxPktData[1] = InverseVer;
+  TxPktData[2] = (byte)(msgtype>>8);
+  TxPktData[3] = (byte)(msgtype);
+  TxPktData[4] = (byte)(Len >> 24 );
+  TxPktData[5] = (byte)(Len >> 16 );
+  TxPktData[6] = (byte)(Len >> 8 );
+  TxPktData[7] = (byte)(Len );
+ 
+  rel = tcpSend(SocketId, TxPktData, 8 );
+  if (rel == 0)
+  { 
+    ByteArray_To_String(TxPktData, 8, str);
+    TestSteppass ("SendWrongDianosticMessae","Tester send DoIP message by TCP: %s", str);
+  }
+ else if ((rel == -1) && (IpGetLastSocketError(SocketId)== 997))
+  {
+    ByteArray_To_String(TxPktData, 8, str);
+    TestSteppass ("SendWrongDianosticMessae","Tester send DoIP message by TCP: %s", str);
+  }
+  else
+  {
+    IpGetLastSocketErrorAsString( SocketId, err_String, elcount(err_String));
+    TestStepFail("SendWrongDianosticMessae", " Tester send DoIP message by TCP failed with result %d (%s)", IpGetLastSocketError(SocketId), err_String ); 
+  }
+}
+
+
+/// <DoIPSend>
+export testfunction  SendAliveCheckResp(byte SrcLogicAddr[], dword SocketId)
+{
+  long rel;
+  char err_String[100];
+  char str[1500];
+  TxPktData[0] = 0x02;
+  TxPktData[1] = 0xFD;
+  TxPktData[2] = 0x00;
+  TxPktData[3] = 0x08;
+  TxPktData[4] = 0x00;
+  TxPktData[5] = 0x00;
+  TxPktData[6] = 0x00;
+  TxPktData[7] = 0x02;
+  TxPktData[8] = SrcLogicAddr[0];
+  TxPktData[9] = SrcLogicAddr[1];
+  rel = tcpSend(SocketId, TxPktData, 10 );
+  if (rel == 0)
+  { 
+    ByteArray_To_String(TxPktData, 10, str);
+    TestSteppass ("SendAliveCheckResponse"," Tester send alive check response: %s", str);
+  }
+ else if ((rel == -1) && (IpGetLastSocketError(SocketId)== 997))
+  {
+    ByteArray_To_String(TxPktData, 10, str);
+    TestSteppass ("SendAliveCheckResponse"," Tester send alive check response: %s", str); 
+  }
+  else
+  {
+    ByteArray_To_String(TxPktData, 10, str);
+    TestSteppass ("SendAliveCheckResponse"," Tester send alive check response: %s", str); 
+    IpGetLastSocketErrorAsString( SocketId, err_String, elcount(err_String));
+    TestStepFail("SendAliveCheckResponse", " Tester sended alive check response failed with result %d (%s)", IpGetLastSocketError(SocketId), err_String ); 
+  }  
+}
+
+/// <DoIPSend>
+export testfunction  SendAliveCheckReq(dword SocketId)
+{
+  long rel;
+  char err_String[100], str[1500];
+  TxPktData[0] = 0x02;
+  TxPktData[1] = 0xFD;
+  TxPktData[2] = 0x00;
+  TxPktData[3] = 0x07;
+  TxPktData[4] = 0x00;
+  TxPktData[5] = 0x00;
+  TxPktData[6] = 0x00;
+  TxPktData[7] = 0x00;
+  rel = tcpSend(SocketId, TxPktData, 8 );
+  if (rel == 0)
+  { 
+    ByteArray_To_String(TxPktData, 8, str);
+    TestSteppass ("SendAliveCheckReq"," Tester send alive check request: %s", str);
+  }
+ else if ((rel == -1) && (IpGetLastSocketError(SocketId)== 997))
+  {
+    ByteArray_To_String(TxPktData, 8, str);
+    TestSteppass ("SendAliveCheckReq"," Tester send alive check request: %s", str);
+  }
+  else
+  {
+    ByteArray_To_String(TxPktData, 8, str);
+    TestSteppass ("SendAliveCheckReq"," Tester send alive check request: %s", str);
+    IpGetLastSocketErrorAsString( SocketId, err_String, elcount(err_String));
+    TestStepFail("SendAliveCheckReq", " Tester sended alive check request failed with result %d (%s)", IpGetLastSocketError(SocketId), err_String ); 
+  } 
+}
+
+
+/// <DoIPSend>
+export testfunction  SendVehicleIdentifcationRequestMessage(char SrcIp[], dword SrcPort, char DesIp[], dword DesPort, byte data[])
+{
+  long rel;
+ 
+  char err_String[100], str[1500];
+  TxPktData[0] = 0x02;
+  TxPktData[1] = 0xFD;
+  TxPktData[2] = 0x00;
+  if(elCount(data)<10)
+  {
+     TxPktData[3] = 0x02;
+  }
+  else
+  {
+    TxPktData[3] = 0x03;
+  }
+  write("elCount(data) = %d", elCount(data));
+ 
+  TxPktData[4] = 0x00;
+  TxPktData[5] = 0x00;
+  TxPktData[6] = 0x00;
+  if(elCount(data)<10)
+  {
+     TxPktData[7] = 0x06;
+  }
+  else
+  {
+    TxPktData[7] = 0x11;
+  }
+  
+  memcpy_off(TxPktData, 8, data, 0, elCount(data));
+  socket=udpOpen(ipGetAddressAsNumber(SrcIp), SrcPort);
+  rel = udpSendTo(socket, ipGetAddressAsNumber(DesIp), DesPort, TxPktData, 8+elCount(data) );
+  if (rel == 0)
+  { 
+    ByteArray_To_String(TxPktData, 8 +elCount(data), str);
+    TestSteppass ("VehicleIdentifcationRequestMessage"," DUT  send vehicle identifcation request: %s", str);
+  }
+ else if ((rel == -1) && (IpGetLastSocketError(socket)== 997))
+  {
+    ByteArray_To_String(TxPktData, 8 +elCount(data), str);
+    TestSteppass ("VehicleIdentifcationRequestMessage"," DUT send vehicle identifcation request:%s", str); 
+  }
+  else
+  {
+    IpGetLastSocketErrorAsString( socket, err_String, elcount(err_String));
+    TestStepFail("VehicleIdentifcationRequestMessage", " Tester sended vehicle identifcation request failed with result %d (%s)", IpGetLastSocketError(socket), err_String ); 
+  } 
+}
+
+/// <DoIPSend>
+export testfunction  SendVehicleIdentifcationRequestMessage(char SrcIp[], dword SrcPort, char DesIp[], dword DesPort)
+{
+  long rel;
+  
+  char err_String[100], str[1500];
+  TxPktData[0] = 0x2D;
+  TxPktData[1] = 0xFD;
+  TxPktData[2] = 0x00;
+  TxPktData[3] = 0x01;
+  TxPktData[4] = 0x00;
+  TxPktData[5] = 0x00;
+  TxPktData[6] = 0x00;
+  TxPktData[7] = 0x00;
+  
+  socket=udpOpen(ipGetAddressAsNumber(SrcIp), SrcPort);
+  rel = udpSendTo(socket, ipGetAddressAsNumber(DesIp), DesPort, TxPktData, 8 );
+  if (rel == 0)
+  { 
+    ByteArray_To_String(TxPktData, 8, str);
+    TestSteppass ("VehicleIdentifcationRequestMessage"," Tester  send vehicle identifcation request: %s", str);
+  }
+ else if ((rel == -1) && (IpGetLastSocketError(socket)== 997))
+  {
+    ByteArray_To_String(TxPktData, 8, str);
+    TestSteppass ("VehicleIdentifcationRequestMessage"," Tester  send vehicle identifcation request: %s", str);
+  }
+  else
+  {
+    IpGetLastSocketErrorAsString( socket, err_String, elcount(err_String));
+    TestStepFail("VehicleIdentifcationRequestMessage", " Tester sended vehicle identifcation request failed with result %d (%s)", IpGetLastSocketError(socket), err_String ); 
+  } 
+}
+/// <DoIPSend>
+export testfunction  SendVehicleIdentifcationRequestMessageFF00(char SrcIp[], dword SrcPort, char DesIp[], dword DesPort)
+{
+  long rel;
+  
+  char err_String[100], str[1500];
+  TxPktData[0] = 0xFF;
+  TxPktData[1] = 0x00;
+  TxPktData[2] = 0x00;
+  TxPktData[3] = 0x01;
+  TxPktData[4] = 0x00;
+  TxPktData[5] = 0x00;
+  TxPktData[6] = 0x00;
+  TxPktData[7] = 0x00;
+  
+  socket=udpOpen(ipGetAddressAsNumber(SrcIp), SrcPort);
+  rel = udpSendTo(socket, ipGetAddressAsNumber(DesIp), DesPort, TxPktData, 8 );
+  if (rel == 0)
+  { 
+    ByteArray_To_String(TxPktData, 8, str);
+    TestSteppass ("VehicleIdentifcationRequestMessage"," Tester  send vehicle identifcation request: %s", str);
+  }
+ else if ((rel == -1) && (IpGetLastSocketError(socket)== 997))
+  {
+    ByteArray_To_String(TxPktData, 8, str);
+    TestSteppass ("VehicleIdentifcationRequestMessage"," Tester  send vehicle identifcation request: %s", str);
+  }
+  else
+  {
+    IpGetLastSocketErrorAsString( socket, err_String, elcount(err_String));
+    TestStepFail("VehicleIdentifcationRequestMessage", " Tester sended vehicle identifcation request failed with result %d (%s)", IpGetLastSocketError(socket), err_String ); 
+  } 
+}
+/// <DoIPSend>
+export testfunction  SendUdpDoIPMessage(byte ProVer, byte InverseVer, word msgtype, dword Len, byte payloaddata[])
+{
+  int i;
+  ethernetPacket IPLMMsg;
+  IPLMMsg.Clear();
+  IPLMMsg.source = EthGetMacAddressAsNumber( "02:00:00:00:10:01" );
+  
+  IPLMMsg.destination = EthGetMacAddressAsNumber( "2:00:00:00:14:60" );
+  //IPLMMsg.destination = EthGetMacAddressAsNumber( "02:00:00:00:14:01" );
+
+  IPLMMsg.ipv4.init();  
+
+  IPLMMsg.ipv4.source.ParseAddress("198.18.32.1");
+  
+  IPLMMsg.ipv4.destination.ParseAddress("198.18.32.96");
+  //IPLMMsg.ipv4.destination.ParseAddress("198.18.36.1");
+  
+  IPLMMsg.udp.Init();   
+  
+  IPLMMsg.udp.source = 13400;
+  
+  IPLMMsg.udp.destination = 13400;
+  
+//  IPLMMsg.SetVlanId(6);
+//  IPLMMsg.SetVlanPriority(7);
+  
+  IPLMMsg.byte(28) = ProVer;//service id
+  IPLMMsg.byte(29) = InverseVer;//service id
+  
+  IPLMMsg.byte(30) = (byte)(msgtype>>8);
+  IPLMMsg.byte(31) = (byte)(msgtype);
+  
+  IPLMMsg.byte(32) = (byte)(Len >> 24 );
+  IPLMMsg.byte(33) = (byte)(Len >> 16 );
+  IPLMMsg.byte(34) = (byte)(Len >> 8 );
+  IPLMMsg.byte(35) = (byte)(Len );
+  for( i=0;i<(elCount(payloaddata));i++)
+  {
+    IPLMMsg.byte(36+i)=payloaddata[i];
+  }  
+  IPLMMsg.Length = 36+(elCount(payloaddata));
+  IPLMMsg.CompletePacket();
+  
+  output(IPLMMsg);
+//  rel = udpSendTo(socket, ipGetAddressAsNumber(DesIp), DesPort, TxPktData, elCount(payloaddata) +8 );
+//  if (rel == 0)
+//  { 
+//    ByteArray_To_String(TxPktData, 19, str);
+//    TestSteppass ("SendUdpDoIPMessage"," Tester send routing request by UDP: %s", str);
+//  }
+// else if ((rel == -1) && (IpGetLastSocketError(socket)== 997))
+//  {
+//    ByteArray_To_String(TxPktData, 19, str);
+//    TestSteppass ("SendUdpDoIPMessage"," Tester send routing request by UDP: %s", str);
+//  }
+//  else
+//  {
+//    IpGetLastSocketErrorAsString( socket, err_String, elcount(err_String));
+//    TestStepFail("VehicleIdentifcationRequestMessage", " DUT sended vehicle identifcation request failed with result %d (%s)", IpGetLastSocketError(socket), err_String ); 
+//  } 
+}
+
+
+/// <DoIPSend>
+export testfunction SendDoIPEntityStatusReq(char SrcIp[], dword SrcPort, char DesIp[], dword DesPort)
+{
+  long rel;
+  
+  char err_String[100], str[1500];
+  TxPktData[0] = 0x02;
+  TxPktData[1] = 0xFD;
+  TxPktData[2] = 0x40;
+  TxPktData[3] = 0x01;
+  TxPktData[4] = 0x00;
+  TxPktData[5] = 0x00;
+  TxPktData[6] = 0x00;
+  TxPktData[7] = 0x00;
+  
+  socket=udpOpen(ipGetAddressAsNumber(SrcIp), SrcPort);
+  rel = udpSendTo(socket, ipGetAddressAsNumber(DesIp), DesPort, TxPktData, 8 );
+  if (rel == 0)
+  { 
+    ByteArray_To_String(TxPktData, 8, str);
+    TestSteppass ("SendDoIPEntityStatusReq"," Tester  send DoIP entity status request : %s" ,str);
+  }
+ else if ((rel == -1) && (IpGetLastSocketError(socket)== 997))
+  {
+    ByteArray_To_String(TxPktData, 8, str);
+    TestSteppass ("SendDoIPEntityStatusReq"," Tester  send DoIP entity status request : %s", str);
+  }
+  else
+  {
+    IpGetLastSocketErrorAsString( socket, err_String, elcount(err_String));
+    TestStepFail("SendDoIPEntityStatusReq", " Tester sended vehicle identifcation request failed with result %d (%s)", IpGetLastSocketError(socket), err_String ); 
+  } 
+}
+
+
+/// <DoIPSend>
+export testfunction SendDiagnosticPowerModeInformationReq(char SrcIp[], dword SrcPort, char DesIp[], dword DesPort)
+{
+  long rel;
+ 
+  char err_String[100], str[1500];
+  TxPktData[0] = 0x02;
+  TxPktData[1] = 0xFD;
+  TxPktData[2] = 0x40;
+  TxPktData[3] = 0x03;
+  TxPktData[4] = 0x00;
+  TxPktData[5] = 0x00;
+  TxPktData[6] = 0x00;
+  TxPktData[7] = 0x00;
+  
+  socket=udpOpen(ipGetAddressAsNumber(SrcIp), SrcPort);
+  rel = udpSendTo(socket, ipGetAddressAsNumber(DesIp), DesPort, TxPktData, 8 );
+  if (rel == 0)
+  { 
+    ByteArray_To_String(TxPktData, 8, str);
+    TestSteppass ("SendDiagnosticPowerModeInformationReq"," Tester  send Diagnostic power mode information request :%s", str);
+  }
+ else if ((rel == -1) && (IpGetLastSocketError(socket)== 997))
+  {
+    ByteArray_To_String(TxPktData, 8, str);
+    TestSteppass ("SendDiagnosticPowerModeInformationReq"," Tester  send Diagnostic power mode information request :%s", str);
+  }
+  else
+  {
+    IpGetLastSocketErrorAsString( socket, err_String, elcount(err_String));
+    TestStepFail("SendDiagnosticPowerModeInformationReq", " Tester send Diagnostic power mode information failed with result %d (%s)", IpGetLastSocketError(socket), err_String ); 
+  }
+}
+
+void GetMaxTimeParameter(float timeArry[])
+{
+  int i;
+  MaxTime = _max(timeArry[0], timeArry[1]); 
+  for(i = 2; i< elCount(timeArry); i++)
+  {
+    MaxTime = _max(MaxTime, timeArry[i]); 
+  }   
+}
+/// <DoIPSend>
+export testfunction Active_TesterPresent(byte status)
+{
+  if(status==1)
+  {
+    teststepPass("TesterPresent","Enable Active Tester Present");
+    setTimer(TesterPresent_Timer,3000);
+  }
+  else
+  {
+    teststepPass("TesterPresent","Disable Active Tester Present");
+    cancelTimer(TesterPresent_Timer);
+  }
+  
+}
+/// <IP_Command>
+export testfunction Send_Ip_Command_TCP(byte OP_TYPE,byte PAYLOAD[],dword LENGTHPAYLOAD)
+{
+   int i;
+  char STR_TEMP[500];
+  ByteArray_To_String(PAYLOAD,LENGTHPAYLOAD,STR_TEMP);
+  switch(OP_TYPE)
+  {
+    case 0:
+      {
+        testStep("Request_type","Payload Str %s",STR_TEMP);
+        break;
+      }
+    case 1:
+       testStep("SetRequest_NoReturn","Payload Str %s",STR_TEMP);
+       break;
+    case 2:
+    testStep("SetRequest","Payload Str %s",STR_TEMP);
+    break;
+    case 3:
+    testStep("Notification_Request","Payload Str %s",STR_TEMP);
+    break;
+    case 4:
+    testStep("Response_type","Payload Str %s",STR_TEMP);
+    break;
+    case 5:
+    testStep("Notification","Payload Str %s",STR_TEMP);
+    break;
+    case 6:
+    testStep("Notification_Cycle","Payload Str %s",STR_TEMP);
+    break;
+    case 0x70:
+    testStep("ACK","Payload Str %s",STR_TEMP);
+    break;
+    case 0xE0:
+    testStep("ERROR","Payload Str %s",STR_TEMP);
+    break;                                       
+  }
+  ICMMsg.Clear();
+  ICMMsg.source = EthGetMacAddressAsNumber( "02:00:00:00:10:01" );
+  
+//  ICMMsg.destination = EthGetMacAddressAsNumber( "02:C4:46:18:1E:00" );
+  ICMMsg.destination = EthGetMacAddressAsNumber( "02:00:00:00:14:60" );
+  ICMMsg.ipv4.init();  
+
+  ICMMsg.ipv4.source.ParseAddress("198.18.32.1");
+  
+  ICMMsg.ipv4.destination.ParseAddress("198.18.36.96");
+//  ICMMsg.ipv4.destination.ParseAddress("192.168.1.2");
+  
+  ICMMsg.tcp.Init();   
+  
+  ICMMsg.tcp.source = 50184;
+  
+  ICMMsg.tcp.destination = 50184;
+  
+  ICMMsg.SetVlanId(6);
+  ICMMsg.SetVlanPriority(7);
+  ICMMsg.byte(40) = 0x00;//service id
+  ICMMsg.byte(41) = 0x0B;//service id
+  
+  ICMMsg.byte(42) = 0x00;//operation id
+  ICMMsg.byte(43) = 0x01;//operation id
+
+  ICMMsg.byte(44) = (8+LENGTHPAYLOAD)&0xFF000000;;//length
+  ICMMsg.byte(45) = (8+LENGTHPAYLOAD)&0xFF0000;;//length
+  ICMMsg.byte(46) =(8+LENGTHPAYLOAD)&0xFF00;;//length
+  ICMMsg.byte(47) = (8+LENGTHPAYLOAD)&0xFF;//length
+  
+  ICMMsg.byte(48) = ICMMsg.byte(41);//service id8
+  ICMMsg.byte(49) = ICMMsg.byte(43);//operation id8
+  ICMMsg.byte(50) = OP_TYPE;//Operation Type
+  ICMMsg.byte(51) = 0x00;//SeqNr
+  
+  ICMMsg.byte(52) = 0x03; //Protocol version 
+  ICMMsg.byte(53) = ICMMsg.byte(50); //Operation Type
+  ICMMsg.byte(54) = 0x00; //Data type
+  ICMMsg.byte(55) = 0x00; //proc
+  
+  for(i=0;i <LENGTHPAYLOAD;i++)
+  {
+    ICMMsg.byte(56+i)=PAYLOAD[i];
+  }
+
+  
+  ICMMsg.Length = 51+LENGTHPAYLOAD;
+  ICMMsg.CompletePacket();
+  
+  output(ICMMsg);
+  
+}
+/// <IP_Command>
+export testfunction Send_Ip_Command_UDP(byte OP_TYPE,byte PAYLOAD[],dword LENGTHPAYLOAD)
+{
+  int i;
+  char STR_TEMP[500];
+  ByteArray_To_String(PAYLOAD,LENGTHPAYLOAD,STR_TEMP);
+  switch(OP_TYPE)
+  {
+    case 0:
+      {
+        testStep("Request_type","Payload Str %s",STR_TEMP);
+        break;
+      }
+    case 1:
+       testStep("SetRequest_NoReturn","Payload Str %s",STR_TEMP);
+       break;
+    case 2:
+    testStep("SetRequest","Payload Str %s",STR_TEMP);
+    break;
+    case 3:
+    testStep("Notification_Request","Payload Str %s",STR_TEMP);
+    break;
+    case 4:
+    testStep("Response_type","Payload Str %s",STR_TEMP);
+    break;
+    case 5:
+    testStep("Notification","Payload Str %s",STR_TEMP);
+    break;
+    case 6:
+    testStep("Notification_Cycle","Payload Str %s",STR_TEMP);
+    break;
+    case 0x70:
+    testStep("ACK","Payload Str %s",STR_TEMP);
+    break;
+    case 0xE0:
+    testStep("ERROR","Payload Str %s",STR_TEMP);
+    break;                                       
+  }
+  ICMMsg.Clear();
+  ICMMsg.source = EthGetMacAddressAsNumber( "02:00:00:00:10:01" );
+  
+//  ICMMsg.destination = EthGetMacAddressAsNumber( "02:C4:46:18:1E:00" );
+  ICMMsg.destination = EthGetMacAddressAsNumber( "02:00:00:00:14:01" );
+  ICMMsg.ipv4.init();  
+
+  ICMMsg.ipv4.source.ParseAddress("198.18.32.1");
+  
+  ICMMsg.ipv4.destination.ParseAddress("198.18.36.1");
+//  ICMMsg.ipv4.destination.ParseAddress("192.168.1.2");
+  
+  ICMMsg.udp.Init();   
+  
+//  ICMMsg.udp.source = 50184;
+  
+//  ICMMsg.udp.destination = 50184;
+    ICMMsg.udp.source = 66666;
+  
+  ICMMsg.udp.destination = 66666;
+  
+  ICMMsg.SetVlanId(6);
+  ICMMsg.SetVlanPriority(7);
+  ICMMsg.byte(28) = 0x00;//service id
+  ICMMsg.byte(29) = 0x0B;//service id
+  
+  ICMMsg.byte(30) = 0x00;//operation id
+  ICMMsg.byte(31) = 0x01;//operation id
+  
+  ICMMsg.byte(32) = (8+LENGTHPAYLOAD)&0xFF000000;;//length
+  ICMMsg.byte(33) = (8+LENGTHPAYLOAD)&0xFF0000;;//length
+  ICMMsg.byte(34) =(8+LENGTHPAYLOAD)&0xFF00;;//length
+  ICMMsg.byte(35) = (8+LENGTHPAYLOAD)&0xFF;//length
+  
+  ICMMsg.byte(36) = ICMMsg.byte(29);//service id8
+  ICMMsg.byte(37) = ICMMsg.byte(31);//operation id8
+  ICMMsg.byte(38) = OP_TYPE;//Operation Type
+  ICMMsg.byte(39) = 0x00;//SeqNr
+  
+  ICMMsg.byte(40) = 0x03; //Protocol version 
+  ICMMsg.byte(41) = ICMMsg.byte(38); //Operation Type
+  ICMMsg.byte(42) = 0x01; //Data type
+  ICMMsg.byte(43) = 0x00; //process
+    //payload
+  ICMMsg.byte(44) = 0x00; 
+  ICMMsg.byte(45) = 0x00; 
+  ICMMsg.byte(46) = 0x00; 
+  ICMMsg.byte(47) = 0x00; 
+  
+  for(i=0;i <LENGTHPAYLOAD;i++)
+  {
+    ICMMsg.byte(44+i)=PAYLOAD[i];
+  }
+  ICMMsg.Length =44+LENGTHPAYLOAD ;
+  ICMMsg.CompletePacket();
+  output(ICMMsg);
+  
+  testStepPass("","Send Success!");
+
+}
+/// <IP_Command>
+export testfunction Send_Ip_Command_UDP2( char SOURCE_IP[],char SOURCE_MAC[],byte OP_TYPE,byte PAYLOAD[],dword LENGTHPAYLOAD)
+{
+  int i;
+  char STR_TEMP[500];
+  ByteArray_To_String(PAYLOAD,LENGTHPAYLOAD,STR_TEMP);
+  switch(OP_TYPE)
+  {
+    case 0:
+      {
+        testStep("Request_type","Payload Str %s",STR_TEMP);
+        break;
+      }
+    case 1:
+       testStep("SetRequest_NoReturn","Payload Str %s",STR_TEMP);
+       break;
+    case 2:
+      testStep("SetRequest","Payload Str %s",STR_TEMP);
+      break;
+    case 3:
+      testStep("Notification_Request","Payload Str %s",STR_TEMP);
+      break;
+    case 4:
+      testStep("Response_type","Payload Str %s",STR_TEMP);
+      break;
+    case 5:
+      testStep("Notification","Payload Str %s",STR_TEMP);
+      break;
+    case 6:
+      testStep("Notification_Cycle","Payload Str %s",STR_TEMP);
+      break;
+    case 0x70:
+      testStep("ACK","Payload Str %s",STR_TEMP);
+      break;
+    case 0xE0:
+      testStep("ERROR","Payload Str %s",STR_TEMP);
+      break;                                       
+  }
+  ICMMsg.Clear();
+  ICMMsg.source = EthGetMacAddressAsNumber( SOURCE_MAC );
+  
+  ICMMsg.destination = EthGetMacAddressAsNumber( "02:00:00:00:14:60" );
+//  ICMMsg.destination = EthGetMacAddressAsNumber( "70:FF:76:1D:92:C1" );
+  ICMMsg.ipv4.init();  
+
+  ICMMsg.ipv4.source.ParseAddress(SOURCE_IP);
+//  
+  ICMMsg.ipv4.destination.ParseAddress("198.18.36.96");
+//  ICMMsg.ipv4.destination.ParseAddress("198.18.36.94");
+  ICMMsg.udp.Init();   
+  
+  ICMMsg.udp.source = 50184;
+  
+  ICMMsg.udp.destination = 50184;
+  
+//  ICMMsg.SetVlanId(6);
+//  ICMMsg.SetVlanPriority(7);
+  ICMMsg.byte(28) = 0x00;//service id
+//  ICMMsg.byte(29) = 0x0B;//service id
+    ICMMsg.byte(29) = 0x00;//service id
+  ICMMsg.byte(30) = 0x00;//operation id
+  ICMMsg.byte(31) = 0x01;//operation id
+  
+  ICMMsg.byte(32) = (8+LENGTHPAYLOAD)&0xFF000000;;//length
+  ICMMsg.byte(33) = (8+LENGTHPAYLOAD)&0xFF0000;;//length
+  ICMMsg.byte(34) =(8+LENGTHPAYLOAD)&0xFF00;;//length
+  ICMMsg.byte(35) = (8+LENGTHPAYLOAD)&0xFF;//length
+  
+  ICMMsg.byte(36) = ICMMsg.byte(29);//service id8
+  ICMMsg.byte(37) = ICMMsg.byte(31);//operation id8
+  ICMMsg.byte(38) = OP_TYPE;//Operation Type
+  ICMMsg.byte(39) = 0x00;//SeqNr
+  
+  ICMMsg.byte(40) = 0x03; //Protocol version 
+  ICMMsg.byte(41) = ICMMsg.byte(38); //Operation Type
+  ICMMsg.byte(42) = 0x01; //Data type
+  ICMMsg.byte(43) = 0x00; //process
+    //payload
+  ICMMsg.byte(44) = 0x00; 
+  ICMMsg.byte(45) = 0x00; 
+  ICMMsg.byte(46) = 0x00; 
+  ICMMsg.byte(47) = 0x00; 
+  
+  for(i=0;i <LENGTHPAYLOAD;i++)
+  {
+    ICMMsg.byte(44+i)=PAYLOAD[i];
+  }
+  ICMMsg.Length =44+LENGTHPAYLOAD ;
+  ICMMsg.CompletePacket();
+  output(ICMMsg);
+  
+  testStepPass("","Send Success!");
+
+}
+/// <IP_LINK>
+void Send_IPLINK(char Source_Mac_Address[],char Destiantion_Mac_Address[],char Source_IPv4[], char Destination_IPV4[],int k )
+{
+  ethernetPacket IPLMMsg;
+  
+  IPLMMsg.Clear();
+  IPLMMsg.source = EthGetMacAddressAsNumber( Source_Mac_Address );
+  
+  IPLMMsg.destination = EthGetMacAddressAsNumber( Destiantion_Mac_Address );
+
+  IPLMMsg.ipv4.init();  
+
+  IPLMMsg.ipv4.source.ParseAddress(Source_IPv4);
+  
+  IPLMMsg.ipv4.destination.ParseAddress(Destination_IPV4);
+
+  
+  IPLMMsg.udp.Init();   
+  
+  IPLMMsg.udp.source = 50001;
+  
+  IPLMMsg.udp.destination = 50001;
+  
+  IPLMMsg.SetVlanId(6);
+  IPLMMsg.SetVlanPriority(7);
+  
+  IPLMMsg.byte(28) = 0xFF;//service id
+  IPLMMsg.byte(29) = 0xFF;//service id
+  
+  IPLMMsg.byte(30) = 0xFF;//operation id
+  IPLMMsg.byte(31) = 0x01;//operation id
+  
+  IPLMMsg.byte(32) = 0x00;//length
+  IPLMMsg.byte(33) = 0x00;//length
+  IPLMMsg.byte(34) = 0x00;//length
+  IPLMMsg.byte(35) = 0x0C;//length byte of payload
+  
+  //SenderHandleID
+  IPLMMsg.byte(36) = 0xFF;//service id
+  IPLMMsg.byte(37) = 0x01;//operation id
+  IPLMMsg.byte(38) = 0x06;//Operation Type
+  IPLMMsg.byte(39) = 0x01;//SeqNr
+//  IPLMMsg.byte(39)=ser;
+//  if(ser>255)
+//    ser=0;
+//  else ser++;
+  
+  IPLMMsg.byte(40) = 0x03; //Protocol version 
+  
+  IPLMMsg.byte(41) = 0x06; //Operation Type
+  
+  IPLMMsg.byte(42) = 0x01; //Data type
+  
+  IPLMMsg.byte(43) = 0x00; //proc
+
+  //Payload
+//  IPLMMsg.byte(44) = ReSourceGroup; 
+//  IPLMMsg.byte(45) = Priority_IPLINK;
+  IPLMMsg.byte(46) = 0x00;  
+  IPLMMsg.byte(47) = 0x00; 
+  
+  if( k==0)
+  {
+    IPLMMsg.byte(39)= sequence_DVR;
+    if(sequence_DVR>255) sequence_DVR=0;
+    else sequence_DVR++;
+    IPLMMsg.byte(44) = ReSourceGroup_DVR; 
+    IPLMMsg.byte(45) = Priority_DVR;
+  }
+    if( k==1)
+  {
+    IPLMMsg.byte(39)= sequence_DMM;
+    if(sequence_DMM>255) sequence_DMM=0;
+    else sequence_DMM++;
+    IPLMMsg.byte(44) = ReSourceGroup_DMM; 
+    IPLMMsg.byte(45) = Priority_DMM;
+  }
+    if( k==2)
+  {
+    IPLMMsg.byte(39)= sequence_VGM;
+    if(sequence_VGM>255) sequence_VGM=0;
+    else sequence_VGM++;
+    IPLMMsg.byte(44) = ReSourceGroup_VGM; 
+    IPLMMsg.byte(45) = Priority_VGM;
+  }
+    if( k==3)
+  {
+    IPLMMsg.byte(39)= sequence_TCAM;
+    if(sequence_TCAM>255) sequence_TCAM=0;
+    else sequence_TCAM++;
+    IPLMMsg.byte(44) = ReSourceGroup_TCAM; 
+    IPLMMsg.byte(45) = Priority_TCAM;
+  }
+    if( k==4)
+  {
+    IPLMMsg.byte(39)= sequence_DHU;
+    if(sequence_DHU>255) sequence_DHU=0;
+    else sequence_DHU++;
+    IPLMMsg.byte(44) = ReSourceGroup_DHU; 
+    IPLMMsg.byte(45) = Priority_DHU;
+  }
+  IPLMMsg.Length = 48;
+  IPLMMsg.CompletePacket();
+  
+  output(IPLMMsg);
+}
+
+/// <NetWork Manager>
+export testfunction StartNetworkManager(int time)
+{
+  setTimer(Send_501,time);
+  TestStepPass ("StartNetworkManager","Send 0x501 01 50 FF FF FF FF FF FF with cycle %d", time);
+}
+
+/// <NetWork Manager>
+export testfunction StopNetworkManager()
+{
+  cancelTimer(Send_501);
+  TestStepPass ("StopNetworkManager","Stop Sending 0x501 01 50 FF FF FF FF FF FF");
+}
+/// <IPLINK>
+export testfunction Start_IP_LINK(int RG,int prio,char Node[])
+{
+    if (Node[0]=='D' && Node[1]=='V' && Node[2]=='R')
+    {
+      sequence_DVR=0;
+      ReSourceGroup_DVR=RG;
+      Priority_DVR=prio;
+      Send_IPLINK("02:00:00:00:15:14","FF:FF:FF:FF:FF:FF","198.18.37.20","198.18.255.255",0);
+      setTimer(IP_LINK_DVR_Timer,1000);
+      TestStep("Start_IP_LINK_DVR","Continuously broadcast the signal (0) with a frequency of 1 per second RG=%x ; Prio= %d ; Node: DVR",ReSourceGroup_DVR,Priority_DVR);
+    }
+   else if (Node[0]=='D' && Node[1]=='M' && Node[2]=='M')
+     {
+      sequence_DMM=0;
+      ReSourceGroup_DMM=RG;
+      Priority_DMM=prio;
+      Send_IPLINK("02:00:00:00:10:12","FF:FF:FF:FF:FF:FF","198.18.32.18","198.18.255.255",1);
+      setTimer(IP_LINK_DMM_Timer,1000);
+      TestStep("Start_IP_LINK_DMM","Continuously broadcast the signal (0) with a frequency of 1 per second RG=%x ; Prio= %d ; Node: DMM",ReSourceGroup_DMM,Priority_DMM);
+    }
+    else if (Node[0]=='V' && Node[1]=='G' && Node[2]=='M')
+    {
+      sequence_VGM=0;
+      ReSourceGroup_VGM=RG;
+      Priority_VGM=prio;
+      Send_IPLINK("02:00:00:00:10:01","FF:FF:FF:FF:FF:FF","198.18.32.1","198.18.255.255",2);
+      setTimer(IP_LINK_VGM_Timer,1000);
+      TestStep("Start_IP_LINK_VGM","Continuously broadcast the signal (0) with a frequency of 1 per second RG=%x ; Prio= %d ; Node: VGM",ReSourceGroup_VGM,Priority_VGM);
+    }
+    else if (Node[0]=='T' && Node[1]=='C' && Node[2]=='A')
+    {
+      sequence_TCAM=0;
+      ReSourceGroup_TCAM=RG;
+      Priority_TCAM=prio;
+      Send_IPLINK("02:00:00:00:10:11","FF:FF:FF:FF:FF:FF","198.18.32.17","198.18.255.255",3);
+      setTimer(IP_LINK_TCAM_Timer,1000);
+      TestStep("Start_IP_LINK_TCAM","Continuously broadcast the signal (0) with a frequency of 1 per second RG=%x ; Prio= %d ; Node:TCAM",ReSourceGroup_TCAM,Priority_TCAM);
+    }
+      else if (Node[0]=='D' && Node[1]=='H' && Node[2]=='U')
+    {
+      sequence_DHU=0;
+      ReSourceGroup_DHU=RG;
+      Priority_DHU=prio;
+      Send_IPLINK("02:00:00:00:10:11","FF:FF:FF:FF:FF:FF","198.18.32.17","198.18.255.255",4);
+      setTimer(IP_LINK_TCAM_Timer,1000);
+      TestStep("Start_IP_LINK_DHU","Continuously broadcast the signal (0) with a frequency of 1 per second RG=%x ; Prio= %d ; Node:DHU",ReSourceGroup_DHU,Priority_DHU);
+    }
+    
+}
+/// <IPLINK>
+export testfunction Stop_IP_LINK(char Node[])
+{
+    if (Node[0]=='D' && Node[1]=='V' && Node[2]=='R')
+    {
+      cancelTimer(IP_LINK_DVR_Timer);
+      TestStep("Stop_IP_LINK_DVR","Stop Continuously broadcast the signal (0) with a frequency of 1 per second Node: DVR");
+    }
+   else if (Node[0]=='D' && Node[1]=='M' && Node[2]=='M')
+     {
+      cancelTimer(IP_LINK_DMM_Timer);
+      TestStep("Stop_IP_LINK_DMM","Stop Continuously broadcast the signal (0) with a frequency of 1 per second Node: DMM");
+    }
+    else if (Node[0]=='V' && Node[1]=='G' && Node[2]=='M')
+    {
+      cancelTimer(IP_LINK_VGM_Timer);
+      TestStep("Stop_IP_LINK_VGM","Stop Continuously broadcast the signal (0) with a frequency of 1 per second Node: VGM");
+    }
+    else if (Node[0]=='T' && Node[1]=='C' && Node[2]=='A')
+    {
+      cancelTimer(IP_LINK_TCAM_Timer);
+      TestStep("Stop_IP_LINK_TCAM","Stop Continuously broadcast the signal (0) with a frequency of 1 per second Node: TCAM");
+    }
+      else if (Node[0]=='D' && Node[1]=='H' && Node[2]=='U')
+    {
+      cancelTimer(IP_LINK_DHU_Timer);
+      TestStep("Stop_IP_LINK_DHU","Stop Continuously broadcast the signal (0) with a frequency of 1 per second Node: DHU");
+    }    
+      
+      
+}
+
+export testfunction Reset_P_Switch_ECU_TCP_SYNC()
+{
+  // Reset Power
+  testStepPass("P_Switch","Turn off -> turn on");
+  @KA3005P::P_Switch = 0;
+  testWaitForTimeout(1000);
+  @KA3005P::P_Switch = 1;
+  testWaitForTextEvent(TCPSYN, 10000);
+}

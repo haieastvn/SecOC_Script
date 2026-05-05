@@ -1,0 +1,490 @@
+/*@!Encoding:1252*/
+includes
+{
+  #include "../lib/Basic.cin"
+  #include "SecOC_Basic.cin"
+  #include "E2E_Simulation.cin"
+}
+variables
+{
+  dword Reset_Cnt_Received,Trip_Cnt_Received;
+//  qword CMAC_Received; //64 bits
+  byte CMAC_Received[16];
+  byte Data_msg_Received[64];
+  byte FV_TxLength_Data_Received;
+  byte SynMac[16];
+  byte TxMac[16];
+  byte RxMac[16];
+  //output
+  //byte SynMac[16];=1;
+  byte optionkey=1;
+}
+/// <Master_Slave testFunctions>
+export testfunction Waitfor_Tx_Msg(message* Txmsg,int timeout)
+//export testfunction Waitfor_Tx_Msg(dbMsg* Txmsg,int timeout)
+{
+  int  time1,time;
+  long ret;
+  byte i;
+  time1=timeNow()/1000;
+  testStep("Waitfor_Tx_Msg","Wait for Master Tx within %d ms",timeout);
+  Waitfor_Tx_Msg_ID=Txmsg.id;
+
+  ret=testWaitForTextEvent(Waitfor_Tx_Msg_event,timeout);
+  time=timeNow()/1000-time1;
+  if(ret==1)
+  {
+    testStepPass("Waitfor_Tx_Msg", "Received message after %d ms",time); 
+    
+  }
+  else
+  {
+    testStepFail("Waitfor_Tx_Msg", "Not receiving  message");
+  }
+ testWaitForTimeout(10);
+  
+}
+/// <Calculate MAC>
+void Cal_MAC(byte key_auth[], byte data[], dword dataLength, byte cmac[], dword cmacLength)
+{
+  //SecurityLocalGenerateCMAC(key_auth, elcount(key_auth), data, dataLength, cmac, cmacLength );
+  if(optionkey==1)
+    cmac_sm4(key_auth, data, dataLength, cmac);
+  else
+    cmac_sm4(key_auth_Init, data, dataLength, cmac);
+}
+/// <Master_Slave Functions>
+void Verify_FVTxLength_Data(byte reset_data, byte msg_cnt_data)
+{
+  byte FVTxLength_Data_temp;
+  byte LSB_Part,LSB_Part2;
+  LSB_Part= reset_data&((1<<ResetFlag_bitSize)-1);
+  LSB_Part2=msg_cnt_data&((1<<Msg_Cnt_Lower_bitSize)-1);
+  FVTxLength_Data_temp=(LSB_Part2<< ResetFlag_bitSize)|LSB_Part;
+  
+  if (FVTxLength_Data_temp==FV_TxLength_Data_Received)
+  {
+    testStepPass("Verify_FVTxLength_Data", "FV correct: %x",FVTxLength_Data_temp);
+  }
+  else
+  {
+//    testStepFail("Verify_FVTxLength_Data", "FV incorrect, FV correct: %x, Received FV: %x",FVTxLength_Data_temp,FV_TxLength_Data_Received);
+   testStepFail("Verify_FVTxLength_Data",
+             "Freshness Value mismatch | Expected FV: 0x%x | Actual FV: 0x%x",
+             FVTxLength_Data_temp,
+             FV_TxLength_Data_Received);
+    
+    
+  }
+}
+/// <Master_Slave Functions>
+void Verify_MAC( byte cmac[])
+{
+  byte cmac_temp[16];
+  byte cmac_temp_len;
+  byte CMAC_Array_Received[16];
+  
+  byte i;
+  byte Ret;
+  char cmac_temp_str[1500];
+  char CMAC_Array_Received_str[1500];
+  cmac_temp_len=extractBitsMSB_nibbleAligned(cmac,elCount(cmac),MAC_Truncated_bitLen,cmac_temp);
+//  uint64ToMSBArray(CMAC_Received,CMAC_Array_Received,cmac_temp_len);
+  for(i=0;i<16;i++)
+  {
+   CMAC_Array_Received[i]=CMAC_Received[i];
+//    testStep("CMAC_Received","CMAC_Received[%i]=0x%x",i,CMAC_Received[i]);
+  }
+  Ret=1;
+  for(i=0;i<cmac_temp_len;i++)
+  {
+    if(cmac_temp[i]!=CMAC_Array_Received[i])
+    {
+      Ret=0;
+    }
+  }
+  ByteArray_To_String(cmac_temp, MAC_Truncated_bitLen/8, cmac_temp_str);
+  ByteArray_To_String(CMAC_Array_Received, MAC_Truncated_bitLen/8, CMAC_Array_Received_str);
+  if (Ret==1)
+  {
+    testStepPass("Verify_MAC", "MAC correct %s",cmac_temp_str);
+  }
+  else
+  {
+    testStepFail("Verify_MAC",
+             "MAC mismatch | Expected MAC: %s | Actual MAC: %s",
+             cmac_temp_str,
+             CMAC_Array_Received_str);
+  }
+  
+}
+
+/// <Slave Functions>
+void Send_SecOC_Sync_Msg_MAC(message *SynMessage, dword trip_Cnt, dword reset_Cnt)
+{
+  byte Data_authenic_temp[128];        // M?ng 7 byte dùng d? tính MAC
+  byte SecOC_SecuredPduDataContainer[8]; // M?ng 8 byte dùng d? xu?t ra CAN Bus
+  byte full_mac[16];                   // M?ng nh?n k?t qu? CMAC t? thu?t toán
+  int bitPos = 0;
+  int startByte = 2;
+  int i;
+  
+  // ==========================================
+  // BU?C 1: XÓA S?CH BUFFER (R?t quan tr?ng)
+  // ==========================================
+  for(i = 0; i < 128; i++) Data_authenic_temp[i] = 0;
+  for(i = 0; i < 8; i++) SecOC_SecuredPduDataContainer[i] = 0;
+  for(i = 0; i < 16; i++) full_mac[i] = 0;
+
+  // ==========================================
+  // BU?C 2: RÁP M?NG 7 BYTE Ð? TÍNH MAC
+  // ==========================================
+  // Thêm Data ID (2 bytes d?u, ki?u Big Endian)
+  Data_authenic_temp[0] = (SynMessage.id >> 8) & 0xFF;
+  Data_authenic_temp[1] = SynMessage.id & 0xFF;
+
+  // Ðóng gói TripCnt (24 bits) và ResetCnt (16 bits)
+  bitPos = 0;
+  // Gi? s? Trip_Cnt_bitSize = 24, Reset_Cnt_bitSize = 16
+  bitPos = packValue(Data_authenic_temp, startByte, trip_Cnt, 24, bitPos);
+  bitPos = packValue(Data_authenic_temp, startByte, reset_Cnt, 16, bitPos);
+
+  // ==========================================
+  // BU?C 3: G?I HÀM TÍNH MAC
+  // ==========================================
+  // Ð? dài input truy?n vào ch? là 7 byte (ID + Trip + Reset)
+  Cal_MAC(key_auth, Data_authenic_temp, 7, full_mac, 16);
+
+  // ==========================================
+  // BU?C 4: RÁP M?NG 8 BYTE Ð? G?I RA CAN BUS
+  // ==========================================
+  // Ðóng gói TripCnt (24 bits) và ResetCnt (16 bits) vào Bus Payload
+  bitPos = 0;
+  bitPos = packValue(SecOC_SecuredPduDataContainer, 0, trip_Cnt, 24, bitPos);
+  bitPos = packValue(SecOC_SecuredPduDataContainer, 0, reset_Cnt, 16, bitPos);
+  
+  // Truncated MAC (C?t l?y 3 byte / 24 bits d?u tiên c?a k?t qu? MAC gán vào duôi b?n tin)
+  SecOC_SecuredPduDataContainer[5] = full_mac[0];
+  SecOC_SecuredPduDataContainer[6] = full_mac[1];
+  SecOC_SecuredPduDataContainer[7] = full_mac[2];
+
+  // ==========================================
+  // BU?C 5: G?N DATA VÀO MESSAGE VÀ PHÁT RA M?NG
+  // ==========================================
+  SynMessage.dlc = 8;
+  for(i = 0; i < 8; i++) 
+  {
+     SynMessage.byte(i) = SecOC_SecuredPduDataContainer[i];
+  }
+  
+  output(SynMessage); // B?n frame Sync lên Bus
+  
+  // Ghi Log d? Debug (B?n có th? b? n?u không c?n thi?t)
+  write("--> SYNC MSG SENT | TripCnt: %d | ResetCnt: %d", trip_Cnt, reset_Cnt);
+  write("--> SYNC MAC: %02X %02X %02X", full_mac[0], full_mac[1], full_mac[2]);
+}
+
+/// <Slave testFunctions>
+export testfunction Send_SecOC_Sync_Msg(message* SynMessage,dword trip_Cnt,dword reset_Cnt)
+{
+  Send_SecOC_Sync_Msg_MAC(SynMessage, trip_Cnt,reset_Cnt);
+}
+
+
+
+/// <Master testFunctions>
+export testfunction Verify_SecOC_Sync_Msg_MAC(message* SynMessage,dword trip_Cnt,dword reset_Cnt)
+{
+  byte Data_authenic_temp[128];
+  int nextByte;
+  byte startByte;
+  byte Data_authenic_len_excl_Mac;
+  byte i;
+  int bitPos;
+  
+    for (i = 0 ; i <128 ; i++)
+  {
+    Data_authenic_temp[i] = 0 ;
+  }
+  
+  Data_authenic_temp[0]=(SynMessage.id >>8);
+  Data_authenic_temp[1]=SynMessage.id & 0xFF;
+  startByte=2;
+  // 
+  bitPos=0;
+  bitPos=packValue(Data_authenic_temp,startByte,trip_Cnt,Trip_Cnt_bitSize,bitPos);
+  bitPos=packValue(Data_authenic_temp,startByte,reset_Cnt,Reset_Cnt_bitSize,bitPos);
+  //add padding before resetcnt
+  bitPos=padToNextByte(bitPos);
+  //
+  nextByte = startByte + (bitPos / 8);
+  
+  Data_authenic_len_excl_Mac=SynMessage.DataLength-(byte)(MAC_Truncated_bitLen/8)+2;
+  for(i=nextByte; i<Data_authenic_len_excl_Mac;i++)
+  {
+    Data_authenic_temp[i]=0x00;
+  }
+  Cal_MAC(key_auth,Data_authenic_temp,Data_authenic_len_excl_Mac,SynMac,elCount(SynMac));
+  Verify_MAC(SynMac);
+}
+/// <Master testFunctions>
+export testfunction Verify_SecOC_Sync_Msg(message* SynMessage,dword trip_Cnt,dword reset_Cnt)
+{
+  if(trip_Cnt==Trip_Cnt_Received)
+  {
+    testStepPass("Verify_SecOC_Sync_Msg", "Received Trip counter equal expected value, Received value= %d",Trip_Cnt_Received);
+      if(reset_Cnt==Reset_Cnt_Received)
+      {
+        testStepPass("Verify_SecOC_Sync_Msg", "Received Reset counter equal expected value, Received value= %d",Reset_Cnt_Received);
+        Verify_SecOC_Sync_Msg_MAC(SynMessage,trip_Cnt,reset_Cnt);
+      }
+      else
+      {
+        testStepFail("Verify_SecOC_Sync_Msg", "Received Reset counter not equal expected value, Received value=%d, expected value=%d",Reset_Cnt_Received,reset_Cnt);
+      }
+  }
+  else
+  {
+    testStepFail("Verify_SecOC_Sync_Msg", "Received Trip counter not equal expected value, Received value=%d, expected value=%d",Trip_Cnt_Received,trip_Cnt);
+  }
+}
+/// <Master_Slave testFunctions>
+export testfunction Verify_SecOC_Tx_Msg(message* Msg,dword trip_Cnt,dword reset_Cnt,dword msg_cnt)
+{
+  Verify_SecOC_Tx_Msg_MAC(Msg,trip_Cnt,reset_Cnt,msg_cnt);
+}
+/// <Master_Slave Functions>
+void Verify_SecOC_Tx_Msg_MAC(message* Msg,dword trip_Cnt,dword reset_Cnt,dword msg_cnt)
+{
+  byte Data_authenic_temp[128];
+  int nextByte;
+  byte startByte;
+  byte Data_authenic_len_excl_Mac;
+  byte i;
+  byte padding;
+  int bitPos;
+  int bitPos2;
+  byte data_bitSize;
+  byte Reset_Flag;
+  byte data_tx[64];
+  byte data_tx_len;
+  char str[1500];
+  for(i=0;i<128;i++)
+  {
+  Data_authenic_temp[i]=0;
+  }
+  //Contain CMAC or Not
+  data_tx_len=Msg.DataLength-(MAC_Truncated_bitLen+Fv_truncated_bitLen)/8;
+  for (i=0; i<data_tx_len; i++)
+  {
+    data_tx[i]=Data_msg_Received[i];
+  }
+  
+  
+  Data_authenic_temp[0]=(Msg.id >>8);
+  Data_authenic_temp[1]=Msg.id & 0xFF;
+  startByte=2;
+  padding=Fv_bitLen-Trip_Cnt_bitSize-Reset_Cnt_bitSize-Msg_Cnt_bitSize-ResetFlag_bitSize;
+   if(padding>=8)
+  {
+    write("Wrong FV Struct");
+  }
+  else
+  {
+    Reset_Flag=(reset_Cnt&0x03)<<padding;
+    data_bitSize=Msg.DataLength*8-(MAC_Truncated_bitLen+Fv_truncated_bitLen);
+    //
+
+    bitPos=0;
+    bitPos=packArray(Data_authenic_temp,startByte,data_tx,data_tx_len,data_bitSize,bitPos);
+    bitPos=packValue(Data_authenic_temp,startByte,trip_Cnt,Trip_Cnt_bitSize,bitPos);
+    bitPos=packValue(Data_authenic_temp,startByte,reset_Cnt,Reset_Cnt_bitSize,bitPos);
+    bitPos=packValue(Data_authenic_temp,startByte,msg_cnt,Msg_Cnt_bitSize,bitPos);
+    bitPos=packValue(Data_authenic_temp,startByte,Reset_Flag,ResetFlag_bitSize,bitPos);
+    bitPos=padToNextByte(bitPos);
+    nextByte = startByte + (bitPos / 8);
+    Data_authenic_len_excl_Mac=nextByte;
+//    for(i=0;i<Data_authenic_len_excl_Mac;i++)
+//    {Write("Data_authenic_temp%d:%x",i,Data_authenic_temp[i]);}
+    ByteArray_To_String(Data_authenic_temp, Data_authenic_len_excl_Mac, str);
+    testStep("Data_authenic","Data_authenic: %s",str);
+    Cal_MAC(key_auth,Data_authenic_temp,Data_authenic_len_excl_Mac,TxMac,elCount(TxMac));
+    Verify_MAC(TxMac);
+    Verify_FVTxLength_Data(Reset_Flag,msg_cnt);
+    
+  }
+  
+}
+/// <Master_Slave testFunctions>
+export testfunction Send_SecOC_Rx_Msg(message* msg,byte data_rx[],byte data_rx_len,dword trip_Cnt,dword reset_Cnt,dword msg_cnt)
+{
+  byte data_rx_len_temp;
+  data_rx_len_temp=msg.Datalength-(MAC_Truncated_bitLen+Fv_truncated_bitLen)/8;
+  Send_SecOC_Rx_Msg_MAC(msg,data_rx,data_rx_len_temp,trip_Cnt,reset_Cnt,msg_cnt);
+}
+
+
+/// <Master_Slave testFunctions>
+export testfunction Send_SecOC_Rx_Msg_WrongMAC(message* SynMessage,byte data_rx[],byte data_rx_len,dword trip_Cnt,dword reset_Cnt,dword msg_cnt)
+{
+  Send_SecOC_Rx_MsgWrongMAC(SynMessage,data_rx,data_rx_len,trip_Cnt,reset_Cnt,msg_cnt);
+}
+
+
+/// <Master_Slave Functions>
+void Send_SecOC_Rx_Msg_MAC(message* Msg,byte data_rx[],byte data_rx_len,dword trip_Cnt,dword reset_Cnt,dword msg_cnt)
+{
+  byte Data_authenic_temp[128];
+  byte SecOC_SecuredPduDataContainer[64];
+  byte SecOC_SecuredPduDataContainer_len;
+  int nextByte;
+  byte startByte;
+  byte Data_authenic_len;
+  byte Data_authenic_len_excl_Mac;
+  byte i;
+  byte Fv_Array[16];
+  byte Fv_Array_len;
+  byte padding;
+  int bitPos;
+  int bitPos2;
+  byte data_bitSize;
+  byte Reset_Flag;
+  char str[1500];
+  char str2[1500];
+  for(i=0;i<128;i++)
+  {
+  Data_authenic_temp[i]=0;
+  }
+  Data_authenic_temp[0]=(Msg.id >>8);
+  Data_authenic_temp[1]=Msg.id & 0xFF;
+  startByte=2;
+  padding=Fv_bitLen-Trip_Cnt_bitSize-Reset_Cnt_bitSize-Msg_Cnt_bitSize-ResetFlag_bitSize;
+   if(padding>=8)
+  {
+    write("Wrong FV Struct");
+  }
+  else
+  {
+    Reset_Flag=(reset_Cnt&0x03)<<padding;
+    data_bitSize=Msg.DataLength*8-(MAC_Truncated_bitLen+Fv_truncated_bitLen);
+    //
+    bitPos=0;
+    bitPos=packArray(Data_authenic_temp,startByte,data_rx,data_rx_len,data_bitSize,bitPos);
+    bitPos=packValue(Data_authenic_temp,startByte,trip_Cnt,Trip_Cnt_bitSize,bitPos);
+    bitPos=packValue(Data_authenic_temp,startByte,reset_Cnt,Reset_Cnt_bitSize,bitPos);
+    bitPos=packValue(Data_authenic_temp,startByte,msg_cnt,Msg_Cnt_bitSize,bitPos);
+    bitPos=packValue(Data_authenic_temp,startByte,Reset_Flag,ResetFlag_bitSize,bitPos);
+    bitPos=padToNextByte(bitPos);
+    nextByte = startByte + (bitPos / 8);
+    Data_authenic_len_excl_Mac=nextByte;
+    Cal_MAC(key_auth,Data_authenic_temp,Data_authenic_len_excl_Mac,RxMac,elCount(RxMac));
+    ByteArray_To_String(Data_authenic_temp, Data_authenic_len_excl_Mac, str2);
+    TestStep("Data_authenic"," Data message: %s", str2);
+    
+    bitPos=0;
+    bitPos=packValue(Fv_Array,0,trip_Cnt,Trip_Cnt_bitSize,bitPos);
+    bitPos=packValue(Fv_Array,0,reset_Cnt,Reset_Cnt_bitSize,bitPos);
+    bitPos=packValue(Fv_Array,0,msg_cnt,Msg_Cnt_bitSize,bitPos);
+    bitPos=packValue(Fv_Array,0,Reset_Flag,ResetFlag_bitSize,bitPos);
+    bitPos=padToNextByte(bitPos);
+    nextByte = 0 + (bitPos / 8);
+    Fv_Array_len=nextByte;
+//    Write("0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x ", Fv_Array[0],Fv_Array[1],Fv_Array[2],Fv_Array[3],Fv_Array[4],Fv_Array[5],Fv_Array[6],Fv_Array[7]);
+    
+    bitPos=0;
+    bitPos=packArray(SecOC_SecuredPduDataContainer,0,data_rx,data_rx_len,data_bitSize,bitPos);
+    bitPos=packArrayFromLSB_MSBOut(SecOC_SecuredPduDataContainer,0,Fv_Array,Fv_Array_len,Fv_truncated_bitLen,bitPos);
+    bitPos=packArray(SecOC_SecuredPduDataContainer,0,RxMac,elCount(RxMac),MAC_Truncated_bitLen,bitPos);
+    nextByte = 0 + (bitPos / 8);
+    SecOC_SecuredPduDataContainer_len=nextByte;
+    
+    for(i=0;i<SecOC_SecuredPduDataContainer_len;i++)
+    {
+      Msg.byte(i)=SecOC_SecuredPduDataContainer[i];
+//      Write("SecOC_SecuredPduDataContainer:0x%x ",SecOC_SecuredPduDataContainer[i]);
+    }
+    Msg.DataLength=SecOC_SecuredPduDataContainer_len;
+    output(Msg);
+  }
+  ByteArray_To_String(SecOC_SecuredPduDataContainer, SecOC_SecuredPduDataContainer_len, str);
+  TestSteppass ("Send_SecOC_Rx_Msg_MAC"," Data message: %s", str);
+}
+
+
+/// <Master_Slave Functions>
+void Send_SecOC_Rx_MsgWrongMAC(message* Msg,byte data_rx[],byte data_rx_len,dword trip_Cnt,dword reset_Cnt,dword msg_cnt)
+{
+  byte Data_authenic_temp[128];
+  byte SecOC_SecuredPduDataContainer[64];
+  byte SecOC_SecuredPduDataContainer_len;
+  int nextByte;
+  byte startByte;
+  byte Data_authenic_len;
+  byte Data_authenic_len_excl_Mac;
+  byte i;
+  byte Fv_Array[16];
+  byte Fv_Array_len;
+  byte padding;
+  int bitPos;
+  int bitPos2;
+  byte data_bitSize;
+  byte Reset_Flag;
+  char str[1500];
+    for(i=0;i<128;i++)
+  {
+  Data_authenic_temp[i]=0;
+  }
+  Data_authenic_temp[0]=(Msg.id >>8);
+  Data_authenic_temp[1]=Msg.id & 0xFF;
+  startByte=2;
+  padding=Fv_bitLen-Trip_Cnt_bitSize-Reset_Cnt_bitSize-Msg_Cnt_bitSize-ResetFlag_bitSize;
+   if(padding>=8)
+  {
+    write("Wrong FV Struct");
+  }
+  else
+  {
+    Reset_Flag=(reset_Cnt&0x03)<<padding;
+    data_bitSize=Msg.DataLength*8-(MAC_Truncated_bitLen+Fv_truncated_bitLen);
+    //
+    bitPos=0;
+    bitPos=packArray(Data_authenic_temp,startByte,data_rx,data_rx_len,data_bitSize,bitPos);
+    bitPos=packValue(Data_authenic_temp,startByte,trip_Cnt,Trip_Cnt_bitSize,bitPos);
+    bitPos=packValue(Data_authenic_temp,startByte,reset_Cnt,Reset_Cnt_bitSize,bitPos);
+    bitPos=packValue(Data_authenic_temp,startByte,msg_cnt,Msg_Cnt_bitSize,bitPos);
+    bitPos=packValue(Data_authenic_temp,startByte,Reset_Flag,ResetFlag_bitSize,bitPos);
+    bitPos=padToNextByte(bitPos);
+    nextByte = startByte + (bitPos / 8);
+    Data_authenic_len_excl_Mac=nextByte;
+    //Cal_MAC(key_auth,Data_authenic_temp,Data_authenic_len_excl_Mac,RxMac,elCount(RxMac));
+    for (i=0;i<elCount(RxMac);i++)
+    {
+      RxMac[i]=0xE0;
+    }
+    bitPos=0;
+    bitPos=packValue(Fv_Array,0,trip_Cnt,Trip_Cnt_bitSize,bitPos);
+    bitPos=packValue(Fv_Array,0,reset_Cnt,Reset_Cnt_bitSize,bitPos);
+    bitPos=packValue(Fv_Array,0,msg_cnt,Msg_Cnt_bitSize,bitPos);
+    bitPos=packValue(Fv_Array,0,Reset_Flag,ResetFlag_bitSize,bitPos);
+    bitPos=padToNextByte(bitPos);
+    nextByte = 0 + (bitPos / 8);
+    Fv_Array_len=nextByte;
+    
+    bitPos=0;
+    bitPos=packArray(SecOC_SecuredPduDataContainer,0,data_rx,data_rx_len,data_bitSize,bitPos);
+    bitPos=packArrayFromLSB_MSBOut(SecOC_SecuredPduDataContainer,0,Fv_Array,Fv_Array_len,Fv_truncated_bitLen,bitPos);
+    bitPos=packArray(SecOC_SecuredPduDataContainer,0,RxMac,elCount(RxMac),MAC_Truncated_bitLen,bitPos);
+    nextByte = 0 + (bitPos / 8);
+    SecOC_SecuredPduDataContainer_len=nextByte;
+    
+    for(i=0;i<SecOC_SecuredPduDataContainer_len;i++)
+    {
+      Msg.byte(i)=SecOC_SecuredPduDataContainer[i];
+    }
+    output(Msg);
+  }
+  ByteArray_To_String(SecOC_SecuredPduDataContainer, SecOC_SecuredPduDataContainer_len, str);
+  TestSteppass ("Send_SecOC_Rx_Msg_MAC"," Data message: %s", str);
+}
+
+

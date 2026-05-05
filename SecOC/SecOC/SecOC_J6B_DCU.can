@@ -1,0 +1,2014 @@
+/*@!Encoding:1252*/
+includes
+{
+#include "SecOC_Func_Static.cin"
+#include "SecOC_Parameter.cin"
+}
+
+variables
+{
+  diagRequest SAIC_J6B_DCU.* DiagReq_SAIC;
+  diagRequest SAIC_J6B_DCU.* DiagResp_SAIC;
+	message FDR_BKPCANFD_NM nm1; // CAN1,CAN2
+	message IBS_SFCANFD_NM nm2;	 // CAN3,CAN4
+	msTimer NMMsg_normal;
+	msTimer timer50ms,timer10ms;
+	message *SynMessage_global;
+	dword trip_Cnt_global;
+	dword reset_Cnt_global;
+	byte SynMessage_global_Cnt = 0;
+  byte timer10ms_cnt=0;
+  
+  //Comkey Request/ tripcntReset request
+	Pdu ICBVC_SecOCComKeyReq_PDU01 ICBVC_SecOCComKeyReq_PDU01_pdu;
+	message ICBVC_SecOC_ComKeyReq ICBVC_SecOC_ComKeyReq_msg2;
+  
+//	Pdu FDR_SecOCComKeyResp_PDU01 FDR_SecOCComKeyResp_PDU01_pdu;
+//  message FDR_SecOC_ComKeyResp FDR_SecOC_ComKeyResp_msg;
+  
+  //tripReset Response
+  pdu ICBAD_SecOCComKeyResp_PDU01 ICBAD_SecOCComKeyResp_PDU01_pdu;
+  message ICBAD_SecOC_ComKeyResp ICBAD_SecOC_ComKeyResp_msg;
+  
+  //Comkey response
+  pdu IPD_Sporadic_PDU35 IPD_Sporadic_PDU035_pdu;
+  message IPD_BKPCANFD_Event_FrS35 IPD_BKPCANFD_Event_FrS35_msg;
+  
+	pdu ICBAD_SecOCLog_PDU01 ICBAD_SecOCLog_PDU01_pdu;
+	message ICBAD_SecOC_Log ICBAD_SecOC_Log_msg;
+}
+on timer NMMsg_normal
+{
+	nm1.byte(0) = 0x00;
+	nm1.byte(1) = 0x00;
+	nm1.byte(2) = 0x00;
+	nm1.byte(3) = 0x00;
+	nm1.byte(4) = 0x00;
+	nm1.byte(5) = 0x00;
+	nm1.byte(6) = 0x00;
+	nm1.byte(7) = 0x00;
+
+	nm2.byte(0) = 0x00;
+	nm2.byte(1) = 0x00;
+	nm2.byte(2) = 0x00;
+	nm2.byte(3) = 0x00;
+	nm2.byte(4) = 0x00;
+	nm2.byte(5) = 0x00;
+	nm2.byte(6) = 0x00;
+	nm2.byte(7) = 0x00;
+	output(nm1);
+	output(nm2);
+	setTimer(NMMsg_normal, 10);
+}
+on timer timer50ms
+{
+
+	Send_SecOC_Sync_Msg(SynMessage_global, trip_Cnt_global, reset_Cnt_global);
+	SynMessage_global_Cnt = SynMessage_global_Cnt + 1;
+  
+	if (SynMessage_global_Cnt < 3)
+	{
+		setTimer(timer50ms, 50);
+	}
+}
+on timer timer10ms
+{
+
+	triggerPDU(ICBVC_SecOCComKeyReq_PDU01_pdu);
+	timer10ms_cnt = timer10ms_cnt + 1;
+	if (timer10ms_cnt < 3)
+	{
+		setTimer(timer10ms, 50);
+	}
+}
+// void CAN_Disturb_BKP()
+//{
+//    byte buffer[6];
+
+//  CanDisturbanceFrameTrigger frameTrigger;
+//  CanDisturbanceSequence sequence;
+//  CanDisturbanceTriggerRepetitions repetitions;
+//  dword deviceID;
+//  long valditiyMask;
+//  message BKPCANFD_1.0x51 triggerMessage; //   RX
+//  long validityMask;
+//  long result;
+//  int RX_Direc = 0x20;
+//  int TX_Direc = 0x40;
+
+//  triggerMessage.FDF = 1;
+
+//  // clear the sequence
+//  sequence.Clear();
+
+//  // CHANGE THIS DEVICE ID 2 = CAN2  1 = CAN1
+//  deviceID = 1;
+//  // configure the message should be triggered
+
+//  // ID must standard ID and a CAN message must on the bus
+//  validityMask = @sysvar::CanDisturbance::Enums::ValidityMaskFlags::IDBase | @sysvar::CanDisturbance::Enums::ValidityMaskFlags::IDE | @sysvar::CanDisturbance::Enums::ValidityMaskFlags::FDF;
+//  // validityMask = 0;
+//  frameTrigger.SetMessage(triggerMessage, deviceID, validityMask);
+//  frameTrigger.TriggerFieldType =
+//      @sysvar::CanDisturbance::Enums::FieldType::CRCDel;
+//  frameTrigger.TriggerFieldOffset = 0;
+
+//  // configure a sequence 320 FPGA ticks long and send a recessive bit at the Ack slot
+//  // bit on the bus.
+//  result = sequence.AppendToSequence(320, 'R');
+
+//  // Define 33 repetitions and one cycle with a 1 ms hold off time
+//  repetitions.Cycles = 32;
+//  repetitions.HoldOffCycles = 0; // 100ms
+//  repetitions.HoldOffRepetitions = 0;
+//  repetitions.Repetitions =1;
+
+//  if (result == 1)
+//  {
+//    result = canDisturbanceTriggerEnable(deviceID, frameTrigger, sequence, repetitions, RX_Direc); //     ??      RX         ?  ?
+//    if (result == 1)
+//    {
+//      write("Trigger is enabled");
+//    }
+//    else
+//    {
+//      write("Enable trigger error Result =%d", result);
+//    }
+//  }
+//}
+testfunction Send_SecOC_Sync_Msg_J6B(message *SynMessage, dword trip_Cnt, dword reset_Cnt)
+{
+
+	SynMessage_global = SynMessage;
+	trip_Cnt_global = trip_Cnt;
+	reset_Cnt_global = reset_Cnt;
+	SynMessage_global_Cnt = 0;
+	setTimer(timer50ms, 1);
+  testStep("Send_SecOC_Sync_Msg_J6B", "Send Syn message with tripcnt= 0x%x, resetcnt= 0x%x", trip_Cnt,reset_Cnt);
+}
+testfunction ComKey_EnableReq(byte arg)
+{
+  byte value;
+
+  if (arg == 1)
+  {
+    value = 1;
+  }
+  else
+  {
+    value = 0;
+  }
+
+  ICBVC_SecOCComKeyReq_PDU01_pdu.IComKeyEnbReq = value;
+
+  timer10ms_cnt = 0;
+  triggerPDU(ICBVC_SecOCComKeyReq_PDU01_pdu);
+  setTimer(timer10ms, 10);
+
+  testStep("ComKey_EnableReq", "ICBVC_SecOCComKeyReq_PDU01_pdu.IComKeyEnbReq= 0x%x", arg);
+}
+
+testfunction Verify_ComKey_EnableResp(byte arg)
+{
+  long result;
+  byte actual;
+
+  testStep("Verify_ComKey_EnableResp", "Check IFDRTripCtrRstResp signal equal 0x%x", arg);
+
+  result = testWaitForMessage(IPD_BKPCANFD_Event_FrS35, 1000);
+
+  if (result != 1)
+  {
+    testStepFail("Verify_ComKey_EnableResp", "Didn't receive any IPD_BKPCANFD_Event_FrS35 message");
+  }
+  else
+  {
+    actual = IPD_Sporadic_PDU035_pdu.IIPDComKeyEnbResp;
+
+    if (actual == arg)
+    {
+      testStepPass("Verify_ComKey_EnableResp", "Received IIPDComKeyEnbResp signal equal 0x%x", arg);
+    }
+    else
+    {
+      testStepFail("Verify_ComKey_EnableResp", "Received IIPDComKeyEnbResp signal not equal 0x%x , Actual value = 0x%x", arg,actual );
+    }
+  }
+}
+
+testfunction TripCnt_ResetReq(byte arg)
+{
+	if (arg == 1)
+	{
+		ICBVC_SecOCComKeyReq_PDU01_pdu.ITripCntResetReq = 1;
+	}
+	else
+	{
+		ICBVC_SecOCComKeyReq_PDU01_pdu.ITripCntResetReq = 0;
+	}
+	triggerPDU(ICBVC_SecOCComKeyReq_PDU01_pdu);
+  testStep("TripCnt_ResetReq", "Send ITripCntResetReq signal equal 0x%x", arg);
+}
+testfunction Verify_TripCnt_ResetResp(byte arg)
+{
+	long result;
+
+	testStep("Verify_TripCnt_ResetResp", "Check IIPDTripCntResetResp signal equal 0x%x", arg);
+	result = testWaitFormessage(ICBAD_SecOC_ComKeyResp, 1000);
+//  Waitfor_Tx_Msg_ID=FDR_SecOC_ComKeyResp_msg.id;
+//  result= testWaitForTextEvent(Waitfor_Tx_Msg_event,1000);
+	if (result == 1)
+	{
+		if (ICBAD_SecOCComKeyResp_PDU01_pdu.IIPDTripCntResetResp == arg)
+		{
+			testStepPass("Verify_TripCnt_ResetResp", "Received IIPDTripCntResetResp signal equal 0x%x", arg);
+		}
+		else
+		{
+			testStepFail("Verify_TripCnt_ResetResp", "Received IIPDTripCntResetResp signal not equal 0x%x,actual result 0x%x", arg,ICBAD_SecOCComKeyResp_PDU01_pdu.IIPDTripCntResetResp);
+		}
+	}
+	else
+	{
+		testStepFail("Verify_TripCnt_ResetResp", "Didn't received any ICBAD_SecOC_ComKeyResp message");
+	}
+}
+
+testfunction Verify_LogSecOC(dword DataID, dword tripcnt, dword resetcnt, byte ErrorCount)
+{
+	long result;
+  dword val_temp;
+	testStep("Verify_LogSecOC", "Check signals equal ");
+	result = testWaitFormessage(ICBAD_SecOC_Log, 5000);
+
+	if (result == 1)
+	{
+    val_temp=$ICBAD_SecOCLog_PDU01::IIPDDataId.raw;
+		if (val_temp == DataID)
+		{
+			testStepPass("IIPDDataId", "signal value equal 0x%x", DataID);
+		}
+		else
+		{
+			testStepFail("IIPDDataId", "signal value equal 0x%x,not equal 0x%x", val_temp, DataID);
+		}
+    val_temp=$ICBAD_SecOCLog_PDU01::IIPDFailedReason.raw;
+		if (val_temp == 0x01)
+		{
+			testStepPass("IIPDFailedReason", "signal value equal 0x%x", 0x01);
+		}
+		else
+		{
+			testStepFail("IIPDFailedReason", "signal value equal 0x%x,not equal 0x%x", val_temp, 0x01);
+		}
+    val_temp=$ICBAD_SecOCLog_PDU01::IIPDTripCnt.raw;
+		if (val_temp != tripcnt)
+		{
+			testStepPass("IIPDTripCnt", "signal value equal 0x%x", tripcnt);
+		}
+		else
+		{
+			testStepFail("IIPDTripCnt", "signal value equal 0x%x,not equal 0x%x", val_temp, tripcnt);
+		}
+    val_temp=$ICBAD_SecOCLog_PDU01::IIPDResetCnt.raw;
+		if ( val_temp != resetcnt)
+		{
+			testStepPass("IIPDResetCnt", "signal value equal 0x%x", resetcnt);
+		}
+		else
+		{
+			testStepFail("IIPDResetCnt", "signal value equal 0x%x,not equal 0x%x", val_temp, resetcnt);
+		}
+    val_temp=$ICBAD_SecOCLog_PDU01::IIPDErrorCount.raw;
+		if (val_temp == ErrorCount)
+		{
+			testStepPass("IIPDErrorCount", "signal value equal 0x%x", ErrorCount);
+		}
+		else
+		{
+			testStepFail("IIPDErrorCount", "signal value equal 0x%x,not equal 0x%x", val_temp, ErrorCount);
+		}
+    val_temp=$ICBAD_SecOCLog_PDU01::IIPDTripNvmTag.raw;
+		if (val_temp == 0)
+		{
+			testStepPass("IIPDTripNvmTag", "signal value equal 0x%x", 0);
+		}
+		else
+		{
+			testStepFail("IIPDTripNvmTag", "signal value equal 0x%x,not equal 0x%x", val_temp, 0);
+		}
+    
+        val_temp=$ICBAD_SecOCLog_PDU01::IIPDKeyStatus.raw;
+		if (val_temp == 0)
+		{
+			testStepPass("IIPDKeyStatus", "signal value equal 0x%x", 0);
+		}
+		else
+		{
+			testStepFail("IIPDKeyStatus", "signal value equal 0x%x,not equal 0x%x", val_temp, 0);
+		}
+    
+            val_temp=$ICBAD_SecOCLog_PDU01::IIPDAlgFlag.raw;
+		if (val_temp == 0)
+		{
+			testStepPass("IIPDAlgFlag", "signal value equal 0x%x", 0);
+		}
+		else
+		{
+			testStepFail("IIPDAlgFlag", "signal value equal 0x%x,not equal 0x%x", val_temp, 0);
+		}
+     
+	}
+	else
+	{
+		testStepFail("Verify_LogSecOC", "Didn't received any ICBAD_SecOC_Log message");
+	}
+ 
+}
+
+testcase TC_SecOC_02()
+{
+	// Requirement: RSY-1317710
+	// Purpose:
+	// Verify SecOC synchronization mechanism after ECU wakeup:
+	// - ECU enters valid operational state
+	// - SecOC communication key is enabled
+	// - Trip Counter reset routine is executed
+	// - Sync message updates TripCnt and ResetCnt correctly
+	// - Message Counter resets after synchronization
+	// - Secured TX message contains correct freshness and MAC
+
+	long result;
+
+	BeginTest("TC_SecOC_02");
+
+	//--------------------------------------------------
+	// Step 1:
+	// Reset ECU and wait for normal wakeup
+	//--------------------------------------------------
+	Reset_P_Switch_ECU();
+	testWaitForTimeout(2000);
+	setTimer(NMMsg_normal, 10);
+	result = testWaitForTextEvent(ECU_Wakeup, 5000);
+
+	if (result == 1)
+	{
+		testStepPass("Precondition", "ECU wakeup");
+	}
+	else
+	{
+		testStepFail("Precondition", "ECU didn't wakeup");
+	}
+
+	//--------------------------------------------------
+	// Step 2:
+	// Enable SecOC and reset Trip Counter
+	//--------------------------------------------------
+	ComKey_EnableReq(1);
+	TripCnt_ResetReq(1);
+	testWaitForTimeout(200);
+
+	//--------------------------------------------------
+	// Baseline Sync:
+	// Use ResetCnt=1 for initialization only
+	//--------------------------------------------------
+//	Send_SecOC_Sync_Msg_J6B(SecOC_Syn_msg, 1, 1);
+//	Waitfor_Tx_Msg(ICBAD_BKPCANFD_100ms_FrP29_Msg_0x395, 300);
+//
+//	testStepPass("Baseline Sync",
+//	             "Initial synchronization established with TripCnt=1 ResetCnt=1");
+
+	//--------------------------------------------------
+	// Sync Verification Loop:
+	// ResetCnt = 2 ? 6
+	//--------------------------------------------------
+
+  	//---------------- ResetCnt = 1 ----------------
+	
+	Send_SecOC_Sync_Msg_J6B(SecOC_Syn_msg, 1, 1);
+	Waitfor_Tx_Msg(ICBAD_BKPCANFD_100ms_FrP29_Msg_0x395, 500);
+  testWaitForTimeout(50);
+	Verify_SecOC_Tx_Msg(ICBAD_BKPCANFD_100ms_FrP29_Msg_0x395, 1, 1, 1);
+  
+  
+  testWaitForTimeout(500);
+	//---------------- ResetCnt = 2 ----------------
+	Send_SecOC_Sync_Msg_J6B(SecOC_Syn_msg, 1, 2);
+	Waitfor_Tx_Msg(ICBAD_BKPCANFD_100ms_FrP29_Msg_0x395, 500);
+  testWaitForTimeout(50);
+	Verify_SecOC_Tx_Msg(ICBAD_BKPCANFD_100ms_FrP29_Msg_0x395, 1, 2, 1);
+
+//	//---------------- ResetCnt = 3 ----------------
+//
+   testWaitForTimeout(500);
+	Send_SecOC_Sync_Msg_J6B(SecOC_Syn_msg, 1, 3);
+	Waitfor_Tx_Msg(ICBAD_BKPCANFD_100ms_FrP29_Msg_0x395, 500);
+  testWaitForTimeout(100);
+	Verify_SecOC_Tx_Msg(ICBAD_BKPCANFD_100ms_FrP29_Msg_0x395, 1, 3, 1);
+
+	//---------------- ResetCnt = 4 ----------------
+ testWaitForTimeout(500);
+	Send_SecOC_Sync_Msg_J6B(SecOC_Syn_msg, 1, 4);
+	Waitfor_Tx_Msg(ICBAD_BKPCANFD_100ms_FrP29_Msg_0x395, 500);
+  	testWaitForTimeout(100);
+	Verify_SecOC_Tx_Msg(ICBAD_BKPCANFD_100ms_FrP29_Msg_0x395, 1, 4, 1);
+
+	//---------------- ResetCnt = 5 ----------------
+	testWaitForTimeout(500);
+	Send_SecOC_Sync_Msg_J6B(SecOC_Syn_msg, 1, 5);
+	Waitfor_Tx_Msg(ICBAD_BKPCANFD_100ms_FrP29_Msg_0x395, 500);
+  	testWaitForTimeout(100);
+	Verify_SecOC_Tx_Msg(ICBAD_BKPCANFD_100ms_FrP29_Msg_0x395, 1, 5, 1);
+
+	//---------------- ResetCnt = 6 ----------------
+	testWaitForTimeout(500);
+	Send_SecOC_Sync_Msg_J6B(SecOC_Syn_msg, 1, 6);
+	Waitfor_Tx_Msg(ICBAD_BKPCANFD_100ms_FrP29_Msg_0x395, 500);
+  	testWaitForTimeout(100);
+	Verify_SecOC_Tx_Msg(ICBAD_BKPCANFD_100ms_FrP29_Msg_0x395, 1, 6, 1);
+  
+  	//---------------- ResetCnt = 7 ----------------
+	testWaitForTimeout(500);
+	Send_SecOC_Sync_Msg_J6B(SecOC_Syn_msg, 1, 7);
+	Waitfor_Tx_Msg(ICBAD_BKPCANFD_100ms_FrP29_Msg_0x395, 500);
+  	testWaitForTimeout(100);
+	Verify_SecOC_Tx_Msg(ICBAD_BKPCANFD_100ms_FrP29_Msg_0x395, 1, 7, 1);
+  
+  	//---------------- ResetCnt = 8 ----------------
+	testWaitForTimeout(500);
+	Send_SecOC_Sync_Msg_J6B(SecOC_Syn_msg, 1, 8);
+	Waitfor_Tx_Msg(ICBAD_BKPCANFD_100ms_FrP29_Msg_0x395, 500);
+  	testWaitForTimeout(100);
+	Verify_SecOC_Tx_Msg(ICBAD_BKPCANFD_100ms_FrP29_Msg_0x395, 1, 8, 1);
+
+	//--------------------------------------------------
+	// End test
+	//--------------------------------------------------
+	StopTest();
+}
+
+testcase TC_SecOC_03()
+{
+	// requirements:RSY-1317714
+	long result;
+	BeginTest("TC_SecOC_03");
+
+	Reset_P_Switch_ECU();
+
+	setTimer(NMMsg_normal, 10);
+	result = testWaitForTextEvent(ECU_Wakeup, 5000);
+	if (result == 1)
+	{
+		testStepPass("Precondition", "ECU wakeup");
+	}
+	else
+		testStepFail("Precondition", "ECU didn't wakeup");
+	// Bus Off here
+
+	result = testWaitForTextEvent(ECU_Wakeup, 5000);
+	if (result == 1)
+	{
+		testStepPass("Precondition", "ECU wakeup");
+	}
+	else
+		testStepFail("Precondition", "ECU didn't wakeup");
+
+	ComKey_EnableReq(1);
+	//  Verify_ComKey_EnableResp(1);
+	TripCnt_ResetReq(1);
+	//  Verify_TripCnt_ResetResp(1);
+  testWaitForTimeout(200);
+	Send_SecOC_Sync_Msg_J6B(SecOC_Syn_msg, 1, 1);
+
+	Waitfor_Tx_Msg(ICBAD_BKPCANFD_100ms_FrP29_Msg_0x395, 50);
+	Verify_SecOC_Tx_Msg(ICBAD_BKPCANFD_100ms_FrP29_Msg_0x395, 1, 1, 1);
+
+	testWaitForTimeout(1000);
+	Send_SecOC_Sync_Msg_J6B(SecOC_Syn_msg, 1, 2);
+
+	Waitfor_Tx_Msg(ICBAD_BKPCANFD_100ms_FrP29_Msg_0x395, 50);
+	Verify_SecOC_Tx_Msg(ICBAD_BKPCANFD_100ms_FrP29_Msg_0x395, 1, 2, 1);
+
+	StopTest();
+}
+
+testcase TC_SecOC_04()
+{
+  long result;
+
+  BeginTest("TC_SecOC_04");
+
+  Reset_P_Switch_ECU();
+  setTimer(NMMsg_normal, 10);
+
+  result = testWaitForTextEvent(ECU_Wakeup, 5000);
+
+  if (result != 1)
+  {
+    testStepFail("Precondition", "ECU didn't wakeup");
+  }
+  else
+  {
+    testStepPass("Precondition", "ECU wakeup");
+  }
+
+  ComKey_EnableReq(1);
+  Verify_ComKey_EnableResp(1);
+
+  StopTest();
+}
+
+testcase TC_SecOC_05()
+{
+  long result;
+
+  BeginTest("TC_SecOC_05");
+
+  Reset_P_Switch_ECU();
+  setTimer(NMMsg_normal, 10);
+
+  result = testWaitForTextEvent(ECU_Wakeup, 5000);
+
+  if (result != 1)
+  {
+    testStepFail("Precondition", "ECU didn't wakeup");
+  }
+  else
+  {
+    testStepPass("Precondition", "ECU wakeup");
+  }
+
+  ComKey_EnableReq(0);
+  Verify_ComKey_EnableResp(0);
+
+  StopTest();
+}
+
+testcase TC_SecOC_06()
+{
+  long result;
+
+  BeginTest("TC_SecOC_06");
+
+  Reset_P_Switch_ECU();
+  setTimer(NMMsg_normal, 10);
+  ComKey_EnableReq(0);
+  result = testWaitForTextEvent(ECU_Wakeup, 5000);
+
+  if (result != 1)
+  {
+    testStepFail("Precondition", "ECU didn't wakeup");
+  }
+  else
+  {
+    testStepPass("Precondition", "ECU wakeup");
+  }
+
+  TripCnt_ResetReq(1);
+  Verify_TripCnt_ResetResp(1);
+
+  // TripCnt_ResetReq(0);
+  // Verify_TripCnt_ResetResp(0);
+
+  StopTest();
+}
+
+testcase TC_SecOC_07_IPD_BKPCANFD_50ms_FrP49()
+{
+  long result;
+
+  BeginTest("TC_SecOC_07_IPD_BKPCANFD_50ms_FrP49");
+
+  Reset_P_Switch_ECU();
+  setTimer(NMMsg_normal, 10);
+
+  result = testWaitForTextEvent(ECU_Wakeup, 5000);
+
+  if (result != 1)
+  {
+    testStepFail("Precondition", "ECU didn't wakeup");
+  }
+  else
+  {
+    testStepPass("Precondition", "ECU wakeup");
+  }
+
+  ComKey_EnableReq(1);
+  // Verify_ComKey_EnableResp(1);
+
+  TripCnt_ResetReq(1);
+  // Verify_TripCnt_ResetResp(1);
+  testWaitForTimeout(200);
+  Send_SecOC_Sync_Msg_J6B(SecOC_Syn_msg, 1, 1);
+
+  Waitfor_Tx_Msg(IPD_BKPCANFD_50ms_FrP49_MsgID_0x2DD, 200);
+  Verify_SecOC_Tx_Msg(IPD_BKPCANFD_50ms_FrP49_MsgID_0x2DD, 1, 1, 1);
+
+  Waitfor_Tx_Msg(IPD_BKPCANFD_50ms_FrP49_MsgID_0x2DD, 150);
+  Verify_SecOC_Tx_Msg(IPD_BKPCANFD_50ms_FrP49_MsgID_0x2DD, 1, 1, 2);
+
+  StopTest();
+}
+
+testcase TC_SecOC_07_ICBAD_BKPCANFD_100ms_FrP29()
+{
+	long result;
+	BeginTest("TC_SecOC_07_ICBAD_BKPCANFD_100ms_FrP29");
+
+	Reset_P_Switch_ECU();
+
+	setTimer(NMMsg_normal, 10);
+	result = testWaitForTextEvent(ECU_Wakeup, 5000);
+	if (result == 1)
+	{
+		testStepPass("Precondition", "ECU wakeup");
+	}
+	else
+		testStepFail("Precondition", "ECU didn't wakeup");
+
+	ComKey_EnableReq(1);
+	//  Verify_ComKey_EnableResp(1);
+	TripCnt_ResetReq(1);
+	//  Verify_TripCnt_ResetResp(1);
+  testWaitForTimeout(200);
+	Send_SecOC_Sync_Msg_J6B(SecOC_Syn_msg, 1, 1);
+
+	Waitfor_Tx_Msg(ICBAD_BKPCANFD_100ms_FrP29_Msg_0x395, 300);
+	Verify_SecOC_Tx_Msg(ICBAD_BKPCANFD_100ms_FrP29_Msg_0x395, 1, 1, 1);
+
+	Waitfor_Tx_Msg(ICBAD_BKPCANFD_100ms_FrP29_Msg_0x395, 300);
+	Verify_SecOC_Tx_Msg(ICBAD_BKPCANFD_100ms_FrP29_Msg_0x395, 1, 1, 2);
+
+	StopTest();
+}
+
+testcase TC_SecOC_07_ICBAD_RZCUCANFD_20ms_FrP15()
+{
+	long result;
+	BeginTest("TC_SecOC_07_ICBAD_RZCUCANFD_20ms_FrP15");
+
+	Reset_P_Switch_ECU();
+
+	setTimer(NMMsg_normal, 10);
+	result = testWaitForTextEvent(ECU_Wakeup, 5000);
+	if (result == 1)
+	{
+		testStepPass("Precondition", "ECU wakeup");
+	}
+	else
+		testStepFail("Precondition", "ECU didn't wakeup");
+
+	ComKey_EnableReq(1);
+	//  Verify_ComKey_EnableResp(1);
+	TripCnt_ResetReq(1);
+	//  Verify_TripCnt_ResetResp(1);
+  testWaitForTimeout(200);
+	Send_SecOC_Sync_Msg_J6B(SecOC_Syn_msg, 1, 1);
+
+	Waitfor_Tx_Msg(ICBAD_RZCUCANFD_20ms_FrP15_msg, 500);
+	Verify_SecOC_Tx_Msg(ICBAD_RZCUCANFD_20ms_FrP15_msg, 1, 1, 1);
+
+	Waitfor_Tx_Msg(ICBAD_RZCUCANFD_20ms_FrP15_msg, 500);
+	Verify_SecOC_Tx_Msg(ICBAD_RZCUCANFD_20ms_FrP15_msg, 1, 1, 2);
+	StopTest();
+}
+
+testcase TC_SecOC_08_09_IAM_BKPCANFD_20ms_FrP10()
+{
+	long result;
+	byte Data_Msg[64];
+	byte Data_Msg_Len;
+	byte i;
+	BeginTest("TC_SecOC_08_IAM_BKPCANFD_20ms_FrP10");
+
+	Reset_P_Switch_ECU();
+
+	setTimer(NMMsg_normal, 100);
+	result = testWaitForTextEvent(ECU_Wakeup, 5000);
+	if (result == 1)
+	{
+		testStepPass("Precondition", "ECU wakeup");
+	}
+	else
+		testStepFail("Precondition", "ECU didn't wakeup");
+
+	ComKey_EnableReq(1);
+	Verify_ComKey_EnableResp(1);
+	TripCnt_ResetReq(1);
+	Verify_TripCnt_ResetResp(1);
+  testWaitForTimeout(200);
+	Send_SecOC_Sync_Msg_J6B(SecOC_Syn_msg, 1, 1);
+
+	// 1.Valid Secured PDU
+	// Set signal latter
+	Data_Msg_Len = IAM_BKPCANFD_20ms_FrP10_msg.Datalength - (MAC_Truncated_bitLen + Fv_truncated_bitLen) / 8;
+
+	for (i = 0; i < Data_Msg_Len; i++)
+	{
+		Data_Msg[i] = i;
+	}
+	Send_SecOC_Rx_Msg(IAM_BKPCANFD_20ms_FrP10_msg, Data_Msg, Data_Msg_Len, 1, 1, 1);
+	// Check XCP
+	// Don't find signals in A2L
+
+	// 2. Secured PDU wrong MAC
+	for (i = 0; i < Data_Msg_Len; i++)
+	{
+		Data_Msg[i] = i + 2;
+	}
+	Send_SecOC_Rx_Msg_WrongMAC(IAM_BKPCANFD_20ms_FrP10_msg, Data_Msg, Data_Msg_Len, 1, 1, 2);
+	// Check XCP
+	// Don't find signals in A2L
+	StopTest();
+}
+testcase TC_SecOC_08_IAM_ZONE_CONNCANFD_Event_FrS01()
+{
+	long result;
+	byte Data_Msg[64];
+	byte Data_Msg_Len;
+	byte i;
+	BeginTest("TC_SecOC_08_IAM_ZONE_CONNCANFD_Event_FrS01");
+
+	Reset_P_Switch_ECU();
+
+	setTimer(NMMsg_normal, 10);
+	result = testWaitForTextEvent(ECU_Wakeup, 5000);
+	if (result == 1)
+	{
+		testStepPass("Precondition", "ECU wakeup");
+	}
+	else
+		testStepFail("Precondition", "ECU didn't wakeup");
+
+	ComKey_EnableReq(1);
+	//  Verify_ComKey_EnableResp(1);
+	TripCnt_ResetReq(1);
+	//  Verify_TripCnt_ResetResp(1);
+  testWaitForTimeout(200);
+	Send_SecOC_Sync_Msg_J6B(SecOC_Syn_msg, 1, 1);
+
+	testWaitForTimeout(50);
+	// Set signal latter
+	Data_Msg_Len = IAM_ZONE_CONNCANFD_Event_FrS01_msg.Datalength - (MAC_Truncated_bitLen + Fv_truncated_bitLen) / 8;
+	for (i = 0; i < Data_Msg_Len; i++)
+	{
+		Data_Msg[i] = i;
+	}
+	Send_SecOC_Rx_Msg(IAM_ZONE_CONNCANFD_Event_FrS01_msg, Data_Msg, Data_Msg_Len, 1, 1, 1);
+	// Check XCP
+	// Don't find signals in A2L
+
+	StopTest();
+}
+
+testcase TC_SecOC_08_IAM_ZONE_CONNCANFD_Event_FrS02()
+{
+	long result;
+	byte Data_Msg[64];
+	byte Data_Msg_Len;
+	byte i;
+	BeginTest("TC_SecOC_08_IAM_ZONE_CONNCANFD_Event_FrS02");
+
+	Reset_P_Switch_ECU();
+
+	setTimer(NMMsg_normal, 10);
+	result = testWaitForTextEvent(ECU_Wakeup, 5000);
+	if (result == 1)
+	{
+		testStepPass("Precondition", "ECU wakeup");
+	}
+	else
+		testStepFail("Precondition", "ECU didn't wakeup");
+
+	ComKey_EnableReq(1);
+	Verify_ComKey_EnableResp(1);
+	TripCnt_ResetReq(1);
+	Verify_TripCnt_ResetResp(1);
+  testWaitForTimeout(200);
+	Send_SecOC_Sync_Msg_J6B(SecOC_Syn_msg, 1, 1);
+
+	// Set signal latter
+	Data_Msg_Len = IAM_ZONE_CONNCANFD_Event_FrS02_msg.Datalength - (MAC_Truncated_bitLen + Fv_truncated_bitLen) / 8;
+	for (i = 0; i < Data_Msg_Len; i++)
+	{
+		Data_Msg[i] = i;
+	}
+	Send_SecOC_Rx_Msg(IAM_ZONE_CONNCANFD_Event_FrS02_msg, Data_Msg, Data_Msg_Len, 1, 1, 1);
+	// Check XCP
+	// Don't find signals in A2L
+
+	StopTest();
+}
+
+testcase TC_SecOC_08_IAM_ZONE_CONNCANFD_Event_FrS03()
+{
+	long result;
+	byte Data_Msg[64];
+	byte Data_Msg_Len;
+	byte i;
+	BeginTest("TC_SecOC_08_IAM_ZONE_CONNCANFD_Event_FrS03");
+
+	Reset_P_Switch_ECU();
+
+	setTimer(NMMsg_normal, 10);
+	result = testWaitForTextEvent(ECU_Wakeup, 5000);
+	if (result == 1)
+	{
+		testStepPass("Precondition", "ECU wakeup");
+	}
+	else
+		testStepFail("Precondition", "ECU didn't wakeup");
+
+	ComKey_EnableReq(1);
+	Verify_ComKey_EnableResp(1);
+	TripCnt_ResetReq(1);
+	Verify_TripCnt_ResetResp(1);
+  testWaitForTimeout(200);
+	Send_SecOC_Sync_Msg_J6B(SecOC_Syn_msg, 1, 1);
+
+	// Set signal latter
+	Data_Msg_Len = IAM_ZONE_CONNCANFD_Event_FrS03_msg.Datalength - (MAC_Truncated_bitLen + Fv_truncated_bitLen) / 8;
+	for (i = 0; i < Data_Msg_Len; i++)
+	{
+		Data_Msg[i] = i;
+	}
+	Send_SecOC_Rx_Msg(IAM_ZONE_CONNCANFD_Event_FrS03_msg, Data_Msg, Data_Msg_Len, 1, 1, 1);
+	// Check XCP
+	// Don't find signals in A2L
+
+	StopTest();
+}
+
+testcase TC_SecOC_08_ICBVC_BKPCANFD_50ms_FrP55()
+{
+	long result;
+	byte Data_Msg[64];
+	byte Data_Msg_Len;
+	byte i;
+	BeginTest("TC_SecOC_08_ICBVC_BKPCANFD_50ms_FrP55");
+
+	Reset_P_Switch_ECU();
+
+	setTimer(NMMsg_normal, 10);
+	result = testWaitForTextEvent(ECU_Wakeup, 5000);
+	if (result == 1)
+	{
+		testStepPass("Precondition", "ECU wakeup");
+	}
+	else
+		testStepFail("Precondition", "ECU didn't wakeup");
+
+	ComKey_EnableReq(1);
+	Verify_ComKey_EnableResp(1);
+	TripCnt_ResetReq(1);
+	Verify_TripCnt_ResetResp(1);
+  testWaitForTimeout(200);
+	Send_SecOC_Sync_Msg_J6B(SecOC_Syn_msg, 1, 1);
+
+	// Set signal latter
+	Data_Msg_Len = ICBVC_BKPCANFD_50ms_FrP55_msg.Datalength - (MAC_Truncated_bitLen + Fv_truncated_bitLen) / 8;
+	for (i = 0; i < Data_Msg_Len; i++)
+	{
+		Data_Msg[i] = i;
+	}
+	Send_SecOC_Rx_Msg(ICBVC_BKPCANFD_50ms_FrP55_msg, Data_Msg, Data_Msg_Len, 1, 1, 1);
+	// Check XCP
+	// Don't find signals in A2L
+
+	StopTest();
+}
+
+testcase TC_SecOC_08_LHZCU_LHBKBCANFD_50ms_FrP07()
+{
+	long result;
+	byte Data_Msg[64];
+	byte Data_Msg_Len;
+	byte i;
+	BeginTest("TC_SecOC_08_LHZCU_LHBKBCANFD_50ms_FrP07");
+
+	Reset_P_Switch_ECU();
+
+	setTimer(NMMsg_normal, 10);
+	result = testWaitForTextEvent(ECU_Wakeup, 5000);
+	if (result == 1)
+	{
+		testStepPass("Precondition", "ECU wakeup");
+	}
+	else
+		testStepFail("Precondition", "ECU didn't wakeup");
+
+	ComKey_EnableReq(1);
+	Verify_ComKey_EnableResp(1);
+	TripCnt_ResetReq(1);
+	Verify_TripCnt_ResetResp(1);
+  testWaitForTimeout(200);
+	Send_SecOC_Sync_Msg_J6B(SecOC_Syn_msg, 1, 1);
+
+	// Set signal latter
+	Data_Msg_Len = LHZCU_LHBKBCANFD_50ms_FrP07_msg.Datalength - (MAC_Truncated_bitLen + Fv_truncated_bitLen) / 8;
+	for (i = 0; i < Data_Msg_Len; i++)
+	{
+		Data_Msg[i] = i;
+	}
+	Send_SecOC_Rx_Msg(LHZCU_LHBKBCANFD_50ms_FrP07_msg, Data_Msg, Data_Msg_Len, 1, 1, 1);
+	// Check XCP
+	// Don't find signals in A2L
+
+	//  xcpActivate(sysvar::XCP::J6B_DCU_R01C02::l_Rxmsg_Data::IAM_20ms_Group32_Reserved1);
+	//  xcpSetPollingCycle(sysvar::XCP::J6B_DCU_R01C02::l_Rxmsg_Data::IAM_20ms_Group32_Reserved1,1);
+	//
+	//  testWaitForTimeout(20);
+	//  if(@sysvar::XCP::J6B_DCU_R01C02::l_Rxmsg_Data::IAM_20ms_Group32_Reserved1 == 2)
+	//  {
+	//    testStepPass("","Expected Value signal IAM_20ms_Group32_Reserved1:%d = Current value signal IAM_20ms_Group32_Reserved1: %d", 2,@sysvar::XCP::J6B_DCU_R01C02::l_Rxmsg_Data::IAM_20ms_Group32_Reserved1);
+	//  }
+	//  else
+	//  {
+	//    testStepFail("","Expected Value signal IAM_20ms_Group32_Reserved1:%d != Current value signal IAM_20ms_Group32_Reserved1: %d",2, @sysvar::XCP::J6B_DCU_R01C02::l_Rxmsg_Data::IAM_20ms_Group32_Reserved1 );
+	//  }
+
+	StopTest();
+}
+
+//testcase TC_SecOC_08_RZCU_RZCUCANFD_10ms_FrP22()
+//{
+//	long result;
+//	byte Data_Msg[64];
+//	byte Data_Msg_Len;
+//	byte i;
+//	BeginTest("TC_SecOC_08_RZCU_RZCUCANFD_10ms_FrP22");
+//
+//	Reset_P_Switch_ECU();
+//
+//	setTimer(NMMsg_normal, 10);
+//	result = testWaitForTextEvent(ECU_Wakeup, 5000);
+//	if (result == 1)
+//	{
+//		testStepPass("Precondition", "ECU wakeup");
+//	}
+//	else
+//		testStepFail("Precondition", "ECU didn't wakeup");
+//
+//	ComKey_EnableReq(1);
+//	Verify_ComKey_EnableResp(1);
+//	TripCnt_ResetReq(1);
+//	Verify_TripCnt_ResetResp(1);
+//  testWaitForTimeout(200);
+//	Send_SecOC_Sync_Msg_J6B(SecOC_Syn_msg, 1, 1);
+//
+//	// Set signal latter
+//	Data_Msg_Len = RZCU_RZCUCANFD_10ms_FrP22_msg.Datalength - (MAC_Truncated_bitLen + Fv_truncated_bitLen) / 8;
+//	for (i = 0; i < Data_Msg_Len; i++)
+//	{
+//		Data_Msg[i] = i;
+//	}
+//	Send_SecOC_Rx_Msg(RZCU_RZCUCANFD_10ms_FrP22_msg, Data_Msg, Data_Msg_Len, 1, 1, 1);
+//	// Check XCP
+//	// Don't find signals in A2L
+//
+//	StopTest();
+//}
+
+//testcase TC_SecOC_08_RZCU_RZCUCANFD_10ms_FrP23()
+//{
+//	long result;
+//	byte Data_Msg[64];
+//	byte Data_Msg_Len;
+//	byte i;
+//	byte expected_value;
+//	BeginTest("TC_SecOC_08_RZCU_RZCUCANFD_10ms_FrP23");
+//
+//	Reset_P_Switch_ECU();
+//
+//	setTimer(NMMsg_normal, 10);
+//	result = testWaitForTextEvent(ECU_Wakeup, 5000);
+//	if (result == 1)
+//	{
+//		testStepPass("Precondition", "ECU wakeup");
+//	}
+//	else
+//		testStepFail("Precondition", "ECU didn't wakeup");
+//
+//	ComKey_EnableReq(1);
+//	//  Verify_ComKey_EnableResp(1);
+//	TripCnt_ResetReq(1);
+//	//  Verify_TripCnt_ResetResp(1);
+//  testWaitForTimeout(200);
+//	Send_SecOC_Sync_Msg_J6B(SecOC_Syn_msg, 1, 1);
+//	testWaitForTimeout(150);
+//
+//	// CMAC Correctly
+//	expected_value = 1;
+//	RZCU_10ms_PDU23_pdu.IPtACCToqReqResp = expected_value;
+//	RZCU_10ms_PDU23_pdu.IAccelOvrd = expected_value;
+//	Data_Msg_Len = RZCU_RZCUCANFD_10ms_FrP23_msg.Datalength - (MAC_Truncated_bitLen + Fv_truncated_bitLen) / 8;
+//	for (i = 0; i < Data_Msg_Len; i++)
+//	{
+//		Data_Msg[i] = RZCU_10ms_PDU23_pdu.byte(i);
+//	}
+//	Send_SecOC_Rx_Msg(RZCU_RZCUCANFD_10ms_FrP23_msg, Data_Msg, Data_Msg_Len, 1, 1, 1);
+//	testWaitForTimeout(500);
+//	// Check XCP
+//	xcpActivate(sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1);
+//	xcpSetPollingCycle(sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1, 1);
+//
+//	if (@sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1 == expected_value)
+//	{
+//		// AccelOvrd PASS
+//testStepPass("AccelOvrd Check",
+//             "Signal accepted | Expected: %d | Actual: %d",
+//             expected_value,
+//             @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1);
+//	}
+//	else
+//	{
+//// AccelOvrd FAIL
+//testStepFail("AccelOvrd Check",
+//             "Signal mismatch | Expected: %d | Actual: %d",
+//             expected_value,
+//             @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1);
+//	}
+//
+//	xcpActivate(sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2);
+//	xcpSetPollingCycle(sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2, 1);
+//
+//	if (@sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2 == expected_value)
+//	{
+//		// PtACCToqReqResp PASS
+//testStepPass("PtACCToqReqResp Check",
+//             "Signal accepted | Expected: %d | Actual: %d",
+//             expected_value,
+//             @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2);
+//	}
+//	else
+//	{
+//		// PtACCToqReqResp FAIL
+//testStepFail("PtACCToqReqResp Check",
+//             "Signal mismatch | Expected: %d | Actual: %d",
+//             expected_value,
+//             @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2);
+//	}
+//	expected_value = 0;
+//	RZCU_10ms_PDU23_pdu.IPtACCToqReqResp = expected_value;
+//	RZCU_10ms_PDU23_pdu.IAccelOvrd = expected_value;
+//	Data_Msg_Len = RZCU_RZCUCANFD_10ms_FrP23_msg.Datalength - (MAC_Truncated_bitLen + Fv_truncated_bitLen) / 8;
+//	for (i = 0; i < Data_Msg_Len; i++)
+//	{
+//		Data_Msg[i] = RZCU_10ms_PDU23_pdu.byte(i);
+//	}
+//	Send_SecOC_Rx_Msg_WrongMAC(RZCU_RZCUCANFD_10ms_FrP23_msg, Data_Msg, Data_Msg_Len, 1, 1, 2);
+//	testWaitForTimeout(500);
+//	// Check XCP
+//	xcpActivate(sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1);
+//	xcpSetPollingCycle(sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1, 1);
+//
+////	if (@sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1 == expected_value)
+//	{
+//		testStepPass("", "Expected Value signal AccelOvrd:%d = Current value signal AccelOvrd: %d", expected_value, @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1);
+//	}
+////	else
+//	{
+//		testStepFail("", "Expected Value signal AccelOvrd:%d != Current value signal AccelOvrd: %d", expected_value, @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1);
+//	}
+//
+//	xcpActivate(sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2);
+//	xcpSetPollingCycle(sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2, 1);
+//
+//////	if (@sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2 == expected_value)
+////	{
+////		testStepPass("", "Expected Value signal PtACCToqReqResp:%d = Current value signal PtACCToqReqResp: %d", expected_value, @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2);
+////	}
+//////	else
+////	{
+////		testStepFail("", "Expected Value signal PtACCToqReqResp:%d != Current value signal PtACCToqReqResp: %d", expected_value, @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2);
+////	}
+//
+//	StopTest();
+//}
+
+//testcase TC_SecOC_08_RZCU_RZCUCANFD_10ms_FrP23()
+//{
+//	long result;
+//	byte Data_Msg[64];
+//	byte Data_Msg_Len;
+//	byte i;
+//	byte expected_value;
+//
+//	BeginTest("TC_SecOC_08_RZCU_RZCUCANFD_10ms_FrP23");
+//
+//	Reset_P_Switch_ECU();
+//  testWaitForTimeout(1500);
+//	setTimer(NMMsg_normal, 10);
+//	result = testWaitForTextEvent(ECU_Wakeup, 5000);
+//
+//	if (result == 1)
+//	{
+//		testStepPass("Precondition", "ECU wakeup");
+//	}
+//	else
+//	{
+//		testStepFail("Precondition", "ECU didn't wakeup");
+//	}
+//
+//	ComKey_EnableReq(1);
+//	TripCnt_ResetReq(1);
+//	testWaitForTimeout(200);
+//
+//	Send_SecOC_Sync_Msg_J6B(SecOC_Syn_msg, 1, 1);
+//	testWaitForTimeout(150);
+//
+//	//--------------------------------------------------
+//	// Step 1: Send correct MAC message first
+//	// Establish known baseline signal = 1
+//	//--------------------------------------------------
+//	expected_value = 1;
+//
+//	RZCU_10ms_PDU23_pdu.IPtACCToqReqResp = expected_value;
+//	RZCU_10ms_PDU23_pdu.IAccelOvrd = expected_value;
+//
+//	Data_Msg_Len = RZCU_RZCUCANFD_10ms_FrP23_msg.Datalength -
+//	               (MAC_Truncated_bitLen + Fv_truncated_bitLen) / 8;
+//
+//	for (i = 0; i < Data_Msg_Len; i++)
+//	{
+//		Data_Msg[i] = RZCU_10ms_PDU23_pdu.byte(i);
+//	}
+//
+//	Send_SecOC_Rx_Msg(RZCU_RZCUCANFD_10ms_FrP23_msg,
+//	                  Data_Msg,
+//	                  Data_Msg_Len,
+//	                  1,
+//	                  1,
+//	                  1);
+//
+//	testWaitForTimeout(500);
+//
+//	//--------------------------------------------------
+//	// Verify baseline established
+//	//--------------------------------------------------
+//	xcpActivate(sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1);
+//	xcpSetPollingCycle(sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1, 1);
+//
+//	if (@sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1 == expected_value)
+//	{
+//		testStepPass("AccelOvrd Baseline Check",
+//		             "Valid MAC accepted | Baseline established | Expected: %d | Actual: %d",
+//		             expected_value,
+//		             @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1);
+//	}
+//	else
+//	{
+//		testStepFail("AccelOvrd Baseline Check",
+//		             "Baseline setup failed | Expected: %d | Actual: %d",
+//		             expected_value,
+//		             @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1);
+//	}
+//
+//	xcpActivate(sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2);
+//	xcpSetPollingCycle(sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2, 1);
+//
+//	if (@sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2 == expected_value)
+//	{
+//		testStepPass("PtACCToqReqResp Baseline Check",
+//		             "Valid MAC accepted | Baseline established | Expected: %d | Actual: %d",
+//		             expected_value,
+//		             @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2);
+//	}
+//	else
+//	{
+//		testStepFail("PtACCToqReqResp Baseline Check",
+//		             "Baseline setup failed | Expected: %d | Actual: %d",
+//		             expected_value,
+//		             @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2);
+//	}
+//
+//	//--------------------------------------------------
+//	// Step 2: Send wrong MAC message
+//	//--------------------------------------------------
+//  Reset_P_Switch_ECU();
+//  testWaitForTimeout(2000);
+//  
+//	expected_value = 0;
+//
+//	RZCU_10ms_PDU23_pdu.IPtACCToqReqResp = expected_value;
+//	RZCU_10ms_PDU23_pdu.IAccelOvrd = expected_value;
+//
+//	for (i = 0; i < Data_Msg_Len; i++)
+//	{
+//		Data_Msg[i] = RZCU_10ms_PDU23_pdu.byte(i);
+//	}
+//
+//	Send_SecOC_Rx_Msg_WrongMAC(RZCU_RZCUCANFD_10ms_FrP23_msg,
+//	                           Data_Msg,
+//	                           Data_Msg_Len,
+//	                           1,
+//	                           1,
+//	                           2);
+//
+//	testWaitForTimeout(2000);
+//
+//	//--------------------------------------------------
+//	// Wrong MAC should be rejected
+//	// Signal should remain baseline value = 1
+//	//--------------------------------------------------
+//	expected_value = 1;
+//
+//	xcpActivate(sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1);
+//	xcpSetPollingCycle(sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1, 1);
+//
+//	if (@sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1 == expected_value)
+//	{
+//		testStepPass("AccelOvrd Wrong MAC Check",
+//		             "Invalid MAC rejected | Signal retained | Expected baseline: %d | Actual: %d",
+//		             expected_value,
+//		             @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1);
+//	}
+//	else
+//	{
+//		testStepFail("AccelOvrd Wrong MAC Check",
+//		             "Security issue | Invalid MAC accepted | Expected baseline: %d | Actual: %d",
+//		             expected_value,
+//		             @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1);
+//	}
+//
+//	xcpActivate(sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2);
+//	xcpSetPollingCycle(sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2, 1);
+//
+//	if (@sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2 == expected_value)
+//	{
+//		testStepPass("PtACCToqReqResp Wrong MAC Check",
+//		             "Invalid MAC rejected | Signal retained | Expected baseline: %d | Actual: %d",
+//		             expected_value,
+//		             @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2);
+//	}
+//	else
+//	{
+//		testStepFail("PtACCToqReqResp Wrong MAC Check",
+//		             "Security issue | Invalid MAC accepted | Expected baseline: %d | Actual: %d",
+//		             expected_value,
+//		             @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2);
+//	}
+//
+//	StopTest();
+//}
+
+//testcase TC_SecOC_09_RZCU_RZCUCANFD_10ms_FrP23_WrongMAC()
+//{
+//	long result;
+//	byte Data_Msg[64];
+//	byte Data_Msg_Len;
+//	byte i;
+//	byte expected_value;
+//	byte baseline_AccelOvrd;
+//	byte baseline_PtACC;
+//
+//	BeginTest("TC_SecOC_09_RZCU_RZCUCANFD_10ms_FrP23_WrongMAC");
+//
+//	//--------------------------------------------------
+//	// Step 1: Reset ECU and wakeup
+//	//--------------------------------------------------
+//	Reset_P_Switch_ECU();
+//
+//	setTimer(NMMsg_normal, 10);
+//	result = testWaitForTextEvent(ECU_Wakeup, 5000);
+//
+//	if (result == 1)
+//	{
+//		testStepPass("Precondition", "ECU wakeup");
+//	}
+//	else
+//	{
+//		testStepFail("Precondition", "ECU didn't wakeup");
+//	}
+//
+//	//--------------------------------------------------
+//	// Step 2: Enable SecOC
+//	//--------------------------------------------------
+//	ComKey_EnableReq(1);
+//	TripCnt_ResetReq(1);
+//	testWaitForTimeout(200);
+//
+//	//--------------------------------------------------
+//	// Step 3: Master sends 3 sync frames with 50ms interval
+//	//--------------------------------------------------
+//	Send_SecOC_Sync_Msg_J6B(SecOC_Syn_msg, 1, 1);
+//	testWaitForTimeout(50);
+//
+//
+//	//--------------------------------------------------
+//	// Step 4: Send valid MAC first to establish known baseline
+//	//--------------------------------------------------
+//	expected_value = 1;
+//
+//	RZCU_10ms_PDU23_pdu.IPtACCToqReqResp = expected_value;
+//	RZCU_10ms_PDU23_pdu.IAccelOvrd = expected_value;
+//
+//	Data_Msg_Len = RZCU_RZCUCANFD_10ms_FrP23_msg.Datalength -
+//	               (MAC_Truncated_bitLen + Fv_truncated_bitLen) / 8;
+//
+//	for (i = 0; i < Data_Msg_Len; i++)
+//	{
+//		Data_Msg[i] = RZCU_10ms_PDU23_pdu.byte(i);
+//	}
+//
+//	Send_SecOC_Rx_Msg(RZCU_RZCUCANFD_10ms_FrP23_msg,
+//	                  Data_Msg,
+//	                  Data_Msg_Len,
+//	                  1,
+//	                  1,
+//	                  1);
+//
+//	testWaitForTimeout(300);
+//
+//	//--------------------------------------------------
+//	// Step 5: Verify valid MAC accepted
+//	//--------------------------------------------------
+//	xcpActivate(sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1);
+//	xcpSetPollingCycle(sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1, 1);
+//
+//	baseline_AccelOvrd = @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1;
+//
+//	if (baseline_AccelOvrd == expected_value)
+//	{
+//		testStepPass("AccelOvrd Baseline Check",
+//		             "Valid MAC accepted | Baseline established | Expected: %d | Actual: %d",
+//		             expected_value,
+//		             baseline_AccelOvrd);
+//	}
+//	else
+//	{
+//		testStepFail("AccelOvrd Baseline Check",
+//		             "Baseline setup failed | Expected: %d | Actual: %d",
+//		             expected_value,
+//		             baseline_AccelOvrd);
+//	}
+//
+//	xcpActivate(sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2);
+//	xcpSetPollingCycle(sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2, 1);
+//
+//	baseline_PtACC = @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2;
+//
+//	if (baseline_PtACC == expected_value)
+//	{
+//		testStepPass("PtACCToqReqResp Baseline Check",
+//		             "Valid MAC accepted | Baseline established | Expected: %d | Actual: %d",
+//		             expected_value,
+//		             baseline_PtACC);
+//	}
+//	else
+//	{
+//		testStepFail("PtACCToqReqResp Baseline Check",
+//		             "Baseline setup failed | Expected: %d | Actual: %d",
+//		             expected_value,
+//		             baseline_PtACC);
+//	}
+//
+//	//--------------------------------------------------
+//	// Step 6: Send wrong MAC message
+//	//--------------------------------------------------
+//	expected_value = 0;
+//
+//	RZCU_10ms_PDU23_pdu.IPtACCToqReqResp = expected_value;
+//	RZCU_10ms_PDU23_pdu.IAccelOvrd = expected_value;
+//
+//	for (i = 0; i < Data_Msg_Len; i++)
+//	{
+//		Data_Msg[i] = RZCU_10ms_PDU23_pdu.byte(i);
+//	}
+//
+//	Send_SecOC_Rx_Msg_WrongMAC(RZCU_RZCUCANFD_10ms_FrP23_msg,
+//	                           Data_Msg,
+//	                           Data_Msg_Len,
+//	                           1,
+//	                           1,
+//	                           2);
+//
+//	testWaitForTimeout(300);
+//
+//	//--------------------------------------------------
+//	// Step 7: Verify wrong MAC rejected
+//	// Signals must remain baseline value = 1
+//	//--------------------------------------------------
+//	if (@sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1 == baseline_AccelOvrd)
+//	{
+//		testStepPass("AccelOvrd Wrong MAC Check",
+//		             "Invalid MAC rejected | Baseline retained | Expected: %d | Actual: %d",
+//		             baseline_AccelOvrd,
+//		             @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1);
+//	}
+//	else
+//	{
+//		testStepFail("AccelOvrd Wrong MAC Check",
+//		             "Security issue | Invalid MAC accepted | Expected baseline: %d | Actual: %d",
+//		             baseline_AccelOvrd,
+//		             @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1);
+//	}
+//
+//	if (@sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2 == baseline_PtACC)
+//	{
+//		testStepPass("PtACCToqReqResp Wrong MAC Check",
+//		             "Invalid MAC rejected | Baseline retained | Expected: %d | Actual: %d",
+//		             baseline_PtACC,
+//		             @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2);
+//	}
+//	else
+//	{
+//		testStepFail("PtACCToqReqResp Wrong MAC Check",
+//		             "Security issue | Invalid MAC accepted | Expected baseline: %d | Actual: %d",
+//		             baseline_PtACC,
+//		             @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2);
+//	}
+//
+//	StopTest();
+//}
+
+//testcase TC_SecOC_10_RZCU_RZCUCANFD_10ms_FrP23_Replay_InRange()
+//{
+//	long result;
+//	byte Data_Msg[64];
+//	byte Data_Msg_Len;
+//	byte i;
+//	byte expected_value;
+//
+//	BeginTest("TC_SecOC_10_RZCU_RZCUCANFD_10ms_FrP23_Replay_InRange");
+//
+//	//--------------------------------------------------
+//	// Step 1: Reset ECU and wakeup
+//	//--------------------------------------------------
+//	Reset_P_Switch_ECU();
+//
+//	setTimer(NMMsg_normal, 10);
+//	result = testWaitForTextEvent(ECU_Wakeup, 5000);
+//
+//	if (result == 1)
+//	{
+//		testStepPass("Precondition", "ECU wakeup");
+//	}
+//	else
+//	{
+//		testStepFail("Precondition", "ECU didn't wakeup");
+//	}
+//
+//	//--------------------------------------------------
+//	// Step 2: Enable SecOC
+//	//--------------------------------------------------
+//	ComKey_EnableReq(1);
+//	TripCnt_ResetReq(1);
+//	testWaitForTimeout(200);
+//
+//	//--------------------------------------------------
+//	// Step 3: Send 3 sync frames (50ms interval)
+//	//--------------------------------------------------
+//	Send_SecOC_Sync_Msg_J6B(SecOC_Syn_msg, 1, 1);
+//	testWaitForTimeout(50);
+//	//--------------------------------------------------
+//	// Step 4: Build secured valid PDU
+//	//--------------------------------------------------
+//	expected_value = 1;
+//
+//	RZCU_10ms_PDU23_pdu.IPtACCToqReqResp = expected_value;
+//	RZCU_10ms_PDU23_pdu.IAccelOvrd = expected_value;
+//
+//	Data_Msg_Len = RZCU_RZCUCANFD_10ms_FrP23_msg.Datalength -
+//	               (MAC_Truncated_bitLen + Fv_truncated_bitLen) / 8;
+//
+//	for (i = 0; i < Data_Msg_Len; i++)
+//	{
+//		Data_Msg[i] = RZCU_10ms_PDU23_pdu.byte(i);
+//	}
+//
+//	//--------------------------------------------------
+//	// Step 5: Send valid secured PDU
+//	//--------------------------------------------------
+//	Send_SecOC_Rx_Msg(RZCU_RZCUCANFD_10ms_FrP23_msg,
+//	                  Data_Msg,
+//	                  Data_Msg_Len,
+//	                  1,
+//	                  1,
+//	                  1);
+//
+//	testWaitForTimeout(300);
+//
+//	//--------------------------------------------------
+//	// Step 6: Verify first valid message accepted
+//	//--------------------------------------------------
+//	xcpActivate(sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1);
+//	xcpSetPollingCycle(sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1, 1);
+//
+//	if (@sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1 == expected_value)
+//	{
+//		testStepPass("Initial Secure PDU Check",
+//		             "Valid secured PDU accepted | Expected: %d | Actual: %d",
+//		             expected_value,
+//		             @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1);
+//	}
+//	else
+//	{
+//		testStepFail("Initial Secure PDU Check",
+//		             "Valid secured PDU rejected | Expected: %d | Actual: %d",
+//		             expected_value,
+//		             @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1);
+//	}
+//
+//	//--------------------------------------------------
+//	// Step 7: Replay same PDU within allowed range
+//	//--------------------------------------------------
+//	Send_SecOC_Rx_Msg(RZCU_RZCUCANFD_10ms_FrP23_msg,
+//	                  Data_Msg,
+//	                  Data_Msg_Len,
+//	                  1,
+//	                  1,
+//	                  1);
+//
+//	testWaitForTimeout(300);
+//
+//	//--------------------------------------------------
+//	// Step 8: Verify replay message still accepted
+//	//--------------------------------------------------
+//	if (@sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1 == expected_value)
+//	{
+//		testStepPass("Replay Secure PDU Check",
+//		             "Replay within prescribed range accepted | Expected: %d | Actual: %d",
+//		             expected_value,
+//		             @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1);
+//	}
+//	else
+//	{
+//		testStepFail("Replay Secure PDU Check",
+//		             "Replay within prescribed range rejected | Expected: %d | Actual: %d",
+//		             expected_value,
+//		             @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1);
+//	}
+//
+//	//--------------------------------------------------
+//	// Optional verify second signal
+//	//--------------------------------------------------
+//	xcpActivate(sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2);
+//	xcpSetPollingCycle(sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2, 1);
+//
+//	if (@sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2 == expected_value)
+//	{
+//		testStepPass("Replay PtACCToqReqResp Check",
+//		             "Replay accepted | Expected: %d | Actual: %d",
+//		             expected_value,
+//		             @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2);
+//	}
+//	else
+//	{
+//		testStepFail("Replay PtACCToqReqResp Check",
+//		             "Replay rejected | Expected: %d | Actual: %d",
+//		             expected_value,
+//		             @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2);
+//	}
+//
+//	StopTest();
+//}
+
+//testcase TC_SecOC_10()
+//{
+//	long result;
+//	byte Data_Msg[64];
+//	byte Data_Msg_Len;
+//	byte i;
+//	BeginTest("TC_SecOC_10");
+//
+//	Reset_P_Switch_ECU();
+//
+//	setTimer(NMMsg_normal, 100);
+//	result = testWaitForTextEvent(ECU_Wakeup, 5000);
+//	if (result == 1)
+//	{
+//		testStepPass("Precondition", "ECU wakeup");
+//	}
+//	else
+//		testStepFail("Precondition", "ECU didn't wakeup");
+//
+//	ComKey_EnableReq(1);
+//	//  Verify_ComKey_EnableResp(1);
+//	TripCnt_ResetReq(1);
+//	//  Verify_TripCnt_ResetResp(1);
+//  testWaitForTimeout(200);
+//	Send_SecOC_Sync_Msg_J6B(SecOC_Syn_msg, 1, 1);
+//
+//	// 1.Valid Secured PDU
+//	// Set signal latter
+//	Data_Msg_Len = IAM_BKPCANFD_20ms_FrP10_msg.Datalength - (MAC_Truncated_bitLen + Fv_truncated_bitLen) / 8;
+//
+//	for (i = 0; i < Data_Msg_Len; i++)
+//	{
+//		Data_Msg[i] = i;
+//	}
+//	Send_SecOC_Rx_Msg(IAM_BKPCANFD_20ms_FrP10_msg, Data_Msg, Data_Msg_Len, 1, 1, 1);
+//	// Check XCP
+//	// Don't find signals in A2L
+//
+//	// 2. Secured PDU wrong MAC
+//	for (i = 0; i < Data_Msg_Len; i++)
+//	{
+//		Data_Msg[i] = i + 2;
+//	}
+//	Send_SecOC_Rx_Msg_WrongMAC(IAM_BKPCANFD_20ms_FrP10_msg, Data_Msg, Data_Msg_Len, 1, 1, 1);
+//	// Check XCP
+//	// Don't find signals in A2L
+//	StopTest();
+//}
+
+
+//testcase TC_SecOC_11_RZCU_RZCUCANFD_10ms_FrP23_Replay_OutOfRange()
+//{
+//	long result;
+//	byte Data_Msg[64];
+//	byte Data_Msg_Len;
+//	byte i;
+//	byte expected_value;
+//	byte baseline_AccelOvrd;
+//	byte baseline_PtACC;
+//
+//	BeginTest("TC_SecOC_11_RZCU_RZCUCANFD_10ms_FrP23_Replay_OutOfRange");
+//
+//	//--------------------------------------------------
+//	// Step 1: Reset ECU and wakeup
+//	//--------------------------------------------------
+//	Reset_P_Switch_ECU();
+//
+//	setTimer(NMMsg_normal, 10);
+//	result = testWaitForTextEvent(ECU_Wakeup, 5000);
+//
+//	if (result == 1)
+//	{
+//		testStepPass("Precondition", "ECU wakeup");
+//	}
+//	else
+//	{
+//		testStepFail("Precondition", "ECU didn't wakeup");
+//	}
+//
+//	//--------------------------------------------------
+//	// Step 2: Enable SecOC
+//	//--------------------------------------------------
+//	ComKey_EnableReq(1);
+//	TripCnt_ResetReq(1);
+//	testWaitForTimeout(200);
+//
+//	//--------------------------------------------------
+//	// Step 3: Send 3 sync frames (50ms interval)
+//	//--------------------------------------------------
+//	Send_SecOC_Sync_Msg_J6B(SecOC_Syn_msg, 1, 1);
+//	testWaitForTimeout(50);
+//
+//
+//	//--------------------------------------------------
+//	// Step 4: Send valid secured PDU first
+//	//--------------------------------------------------
+//	expected_value = 1;
+//
+//	RZCU_10ms_PDU23_pdu.IPtACCToqReqResp = expected_value;
+//	RZCU_10ms_PDU23_pdu.IAccelOvrd = expected_value;
+//
+//	Data_Msg_Len = RZCU_RZCUCANFD_10ms_FrP23_msg.Datalength -
+//	               (MAC_Truncated_bitLen + Fv_truncated_bitLen) / 8;
+//
+//	for (i = 0; i < Data_Msg_Len; i++)
+//	{
+//		Data_Msg[i] = RZCU_10ms_PDU23_pdu.byte(i);
+//	}
+//
+//	Send_SecOC_Rx_Msg(RZCU_RZCUCANFD_10ms_FrP23_msg,
+//	                  Data_Msg,
+//	                  Data_Msg_Len,
+//	                  1,
+//	                  1,
+//	                  1);
+//
+//	testWaitForTimeout(300);
+//
+//	//--------------------------------------------------
+//	// Step 5: Verify valid message accepted
+//	//--------------------------------------------------
+//	xcpActivate(sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1);
+//	xcpSetPollingCycle(sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1, 1);
+//
+//	baseline_AccelOvrd = @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1;
+//
+//	if (baseline_AccelOvrd == expected_value)
+//	{
+//		testStepPass("Initial Secure PDU Check",
+//		             "Valid secured PDU accepted | Expected: %d | Actual: %d",
+//		             expected_value,
+//		             baseline_AccelOvrd);
+//	}
+//	else
+//	{
+//		testStepFail("Initial Secure PDU Check",
+//		             "Valid secured PDU rejected | Expected: %d | Actual: %d",
+//		             expected_value,
+//		             baseline_AccelOvrd);
+//	}
+//
+//	xcpActivate(sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2);
+//	xcpSetPollingCycle(sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2, 1);
+//
+//	baseline_PtACC = @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2;
+//
+//	//--------------------------------------------------
+//	// Step 6: Replay old PDU with outdated MsgCnt (out of range)
+//	//--------------------------------------------------
+//	// Example:
+//	// ECU already accepted MsgCnt=1
+//	// Replay MsgCnt=1 again after freshness moved forward
+//	//--------------------------------------------------
+//
+//	// Optional delay to move ECU freshness window
+//	testWaitForTimeout(1000);
+//
+//	Send_SecOC_Rx_Msg(RZCU_RZCUCANFD_10ms_FrP23_msg,
+//	                  Data_Msg,
+//	                  Data_Msg_Len,
+//	                  1,
+//	                  1,
+//	                  1);
+//
+//	testWaitForTimeout(300);
+//
+//	//--------------------------------------------------
+//	// Step 7: Verify replay rejected
+//	// Signal must remain unchanged
+//	//--------------------------------------------------
+//	if (@sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1 == baseline_AccelOvrd)
+//	{
+//		testStepPass("Replay Out-of-Range Check",
+//		             "Replay rejected | Baseline retained | Expected: %d | Actual: %d",
+//		             baseline_AccelOvrd,
+//		             @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1);
+//	}
+//	else
+//	{
+//		testStepFail("Replay Out-of-Range Check",
+//		             "Security issue | Outdated replay accepted | Expected baseline: %d | Actual: %d",
+//		             baseline_AccelOvrd,
+//		             @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::AccelOvrd_Copy1);
+//	}
+//
+//	if (@sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2 == baseline_PtACC)
+//	{
+//		testStepPass("Replay PtACCToqReqResp Check",
+//		             "Replay rejected | Baseline retained | Expected: %d | Actual: %d",
+//		             baseline_PtACC,
+//		             @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2);
+//	}
+//	else
+//	{
+//		testStepFail("Replay PtACCToqReqResp Check",
+//		             "Security issue | Outdated replay accepted | Expected baseline: %d | Actual: %d",
+//		             baseline_PtACC,
+//		             @sysvar::XCP::J6B_DCU::l_Rxmsg_Data::PtACCToqReqResp_Copy2);
+//	}
+//
+//	StopTest();
+//}
+
+testcase TC_SecOC_12()
+{
+	long result;
+	byte Data_Msg[64];
+	byte Data_Msg_Len;
+	byte i;
+	BeginTest("TC_SecOC_12");
+
+	Reset_P_Switch_ECU();
+
+	setTimer(NMMsg_normal, 10);
+	result = testWaitForTextEvent(ECU_Wakeup, 5000);
+	if (result == 1)
+	{
+		testStepPass("Precondition", "ECU wakeup");
+	}
+	else
+		testStepFail("Precondition", "ECU didn't wakeup");
+
+	ComKey_EnableReq(1);
+	//  Verify_ComKey_EnableResp(1);
+	//  TripCnt_ResetReq(1);
+	//  Verify_TripCnt_ResetResp(1);
+  testWaitForTimeout(200);
+	Send_SecOC_Sync_Msg_J6B(SecOC_Syn_msg, 1, 1);
+
+	Waitfor_Tx_Msg(IPD_BKPCANFD_50ms_FrP49_MsgID_0x2DD, 300);
+	Verify_SecOC_Tx_Msg(IPD_BKPCANFD_50ms_FrP49_MsgID_0x2DD, 1, 1, 1);
+	Reset_P_Switch_ECU();
+	setTimer(NMMsg_normal, 10);
+	result = testWaitForTextEvent(ECU_Wakeup, 5000);
+	if (result == 1)
+	{
+		testStepPass("Precondition", "ECU wakeup");
+	}
+	else
+		testStepFail("Precondition", "ECU didn't wakeup");
+	//  ComKey_EnableReq(1);
+
+	Waitfor_Tx_Msg(IPD_BKPCANFD_50ms_FrP49_MsgID_0x2DD, 300);
+	Verify_SecOC_Tx_Msg(IPD_BKPCANFD_50ms_FrP49_MsgID_0x2DD, 1, 0, 1);
+
+	StopTest();
+}
+testcase TC_SecOC_13()
+{
+	long result;
+	byte Data_Msg[64];
+	byte Data_Msg_Len;
+	byte i;
+	BeginTest("TC_SecOC_13");
+
+	Reset_P_Switch_ECU();
+
+	setTimer(NMMsg_normal, 10);
+	result = testWaitForTextEvent(ECU_Wakeup, 5000);
+	if (result == 1)
+	{
+		testStepPass("Precondition", "ECU wakeup");
+	}
+	else
+		testStepFail("Precondition", "ECU didn't wakeup");
+
+	ComKey_EnableReq(1);
+	Verify_ComKey_EnableResp(1);
+	TripCnt_ResetReq(1);
+	Verify_TripCnt_ResetResp(1);
+  testWaitForTimeout(200);
+	Send_SecOC_Sync_Msg_J6B(SecOC_Syn_msg, 1, 1);
+  Verify_LogSecOC(SecOC_Syn_msg.id, 1, 1, 1);
+  testWaitForTimeout(200);
+	// Set signal latter
+	Data_Msg_Len = RZCU_RZCUCANFD_10ms_FrP23_msg.Datalength - (MAC_Truncated_bitLen + Fv_truncated_bitLen) / 8;
+	for (i = 0; i < Data_Msg_Len; i++)
+	{
+		Data_Msg[i] = i;
+	}
+	Send_SecOC_Rx_MsgWrongMAC(RZCU_RZCUCANFD_10ms_FrP23_msg, Data_Msg, Data_Msg_Len, 1, 1, 1);
+
+  Verify_LogSecOC(RZCU_RZCUCANFD_10ms_FrP23_msg.id, 1, 1, 1);
+	StopTest();
+}
+
+//--------------------------------------------------
+// Function: Send_DiagnosticSessionControl_Extended
+// Purpose : Send UDS Service 0x10 0x03 using diagRequest object
+//--------------------------------------------------
+void Send_DiagnosticSessionControl_Extended()
+{
+    long result;
+
+    // Set request data: SID 0x10, Sub-function 0x03
+    diagResize(DiagReq_SAIC, 2);
+    diagSetPrimitiveByte(DiagReq_SAIC, 0, 0x10);
+    diagSetPrimitiveByte(DiagReq_SAIC, 1, 0x03);
+
+    // Send request and wait for response
+    result = diagSendRequest(DiagReq_SAIC);
+
+    if(result == 0)
+    {
+        write("UDS Request Sent: 10 03 (Extended Session)");
+    }
+    else
+    {
+        write("Failed to send UDS Request 10 03, Error Code: %d", result);
+    }
+}
+//--------------------------------------------------
+// Function: Send_SecurityAccess_RequestSeed
+// Purpose : Send UDS Service 0x27 0x01 (Request Seed)
+//--------------------------------------------------
+void Send_SecurityAccess_RequestSeed()
+{
+    long result;
+
+    // Resize request to 2 bytes
+    diagResize(DiagReq_SAIC, 2);
+
+    // Set SID and Sub-function
+    diagSetPrimitiveByte(DiagReq_SAIC, 0, 0x27);
+    diagSetPrimitiveByte(DiagReq_SAIC, 1, 0x01);
+
+    // Send request
+    result = diagSendRequest(DiagReq_SAIC);
+
+    if(result == 0)
+    {
+        write("UDS Request Sent: 27 01 (Security Access - Request Seed)");
+    }
+    else
+    {
+        write("Failed to send 27 01, Error Code: %d", result);
+    }
+}
+
+
+//--------------------------------------------------
+// Function: Send_SecurityAccess_SendKey
+// Purpose : Send UDS Service 0x27 0x02 (Send Key)
+// Input   : keyByte0 ~ keyByte3 = Security Key bytes
+//--------------------------------------------------
+void Send_SecurityAccess_SendKey(byte keyByte0, byte keyByte1, byte keyByte2, byte keyByte3)
+{
+    long result;
+
+    // Total length: SID + Sub + 4-byte Key
+    diagResize(DiagReq_SAIC, 6);
+
+    // Set SID and Sub-function
+    diagSetPrimitiveByte(DiagReq_SAIC, 0, 0x27);
+    diagSetPrimitiveByte(DiagReq_SAIC, 1, 0x02);
+
+    // Set Security Key
+    diagSetPrimitiveByte(DiagReq_SAIC, 2, keyByte0);
+    diagSetPrimitiveByte(DiagReq_SAIC, 3, keyByte1);
+    diagSetPrimitiveByte(DiagReq_SAIC, 4, keyByte2);
+    diagSetPrimitiveByte(DiagReq_SAIC, 5, keyByte3);
+
+    // Send request
+    result = diagSendRequest(DiagReq_SAIC);
+
+    if(result == 0)
+    {
+        write("UDS Request Sent: 27 02 (Security Access - Send Key)");
+    }
+    else
+    {
+        write("Failed to send 27 02, Error Code: %d", result);
+    }
+}
+
+//--------------------------------------------------
+// Function: Send_WriteDataByIdentifier_F130
+// Purpose : Send UDS Service 0x2E DID F130 with 32-byte VSN data
+//--------------------------------------------------
+void Send_WriteDataByIdentifier_F130()
+{
+    long result;
+    byte vsnData[32] = {
+        0x01, 0x02, 0x03, 0x04,
+        0x05, 0x06, 0x07, 0x08,
+        0x09, 0x0A, 0x0B, 0x0C,
+        0x0D, 0x0E, 0x0F, 0x10,
+        0x11, 0x12, 0x13, 0x14,
+        0x15, 0x16, 0x17, 0x18,
+        0x19, 0x1A, 0x1B, 0x1C,
+        0x1D, 0x1E, 0x1F, 0x20
+    };
+
+    int i;
+
+    // Total length:
+    // SID (1) + DID (2) + Data (32) = 35 bytes
+    diagResize(DiagReq_SAIC, 35);
+
+    // Service ID
+    diagSetPrimitiveByte(DiagReq_SAIC, 0, 0x2E);
+
+    // DID F130
+    diagSetPrimitiveByte(DiagReq_SAIC, 1, 0xF1);
+    diagSetPrimitiveByte(DiagReq_SAIC, 2, 0x30);
+
+    // Write VSN data
+    for(i = 0; i < 32; i++)
+    {
+        diagSetPrimitiveByte(DiagReq_SAIC, i + 3, vsnData[i]);
+    }
+
+    // Send request
+    result = diagSendRequest(DiagReq_SAIC);
+
+    if(result == 0)
+    {
+        write("UDS Request Sent: 2E F1 30 + 32-byte VSN");
+    }
+    else
+    {
+        write("Failed to send 2E F1 30, Error Code: %d", result);
+    }
+}
+
+//--------------------------------------------------
+//--------------------------------------------------
+void Set_PreCondition_SecOC()
+{
+    // Step 1: Extended Diagnostic Session
+    Send_DiagnosticSessionControl_Extended();
+    testWaitForTimeout(100);
+
+    // Step 2: Request Security Seed
+    Send_SecurityAccess_RequestSeed();
+    testWaitForTimeout(100);
+
+    // Step 3: Send Security Key
+    // Replace with actual calculated key if needed
+    Send_SecurityAccess_SendKey(0x00, 0x00, 0x00, 0x00);
+    testWaitForTimeout(100);
+
+    // Step 4: Write VSN DID F130
+    Send_WriteDataByIdentifier_F130();
+    testWaitForTimeout(100);
+
+    write("Precondition flow completed.");
+}

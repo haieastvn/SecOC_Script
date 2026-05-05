@@ -1,0 +1,191 @@
+/*@!Encoding:936*/
+includes
+{
+
+  
+  #include "SecOC_Func_Static.cin"
+  #include "SecOC_Parameter.cin"
+  
+}
+variables
+{
+
+}
+
+
+/// <Master_TX_Verify>
+testcase Master_Sync_Verify_()
+{
+  BeginTest("Master_Sync_Verify_");
+  Reset_P_Switch_ECU();
+  Waitfor_Tx_Msg(SecOC_Syn_msg,SecOC_Syn_Msg_Cycle);
+  Verify_SecOC_Sync_Msg(SecOC_Syn_msg,0,1);
+  Waitfor_Tx_Msg(SecOC_Syn_msg,SecOC_Syn_Msg_Cycle);
+  Verify_SecOC_Sync_Msg(SecOC_Syn_msg,0,2);
+  Reset_P_Switch_ECU();
+  Waitfor_Tx_Msg(SecOC_Syn_msg,SecOC_Syn_Msg_Cycle);
+  Verify_SecOC_Sync_Msg(SecOC_Syn_msg,1,1);
+}
+/// <Master_TX_Verify>
+testcase Master_Tx_Verify_()
+{
+  byte Data_tx[16]={0x01,0x02,0x03,0x04,0x05,0x06};
+  BeginTest("Master_Tx_Verify_");
+  Reset_P_Switch_ECU();
+  Waitfor_Tx_Msg(SecOC_Syn_msg,SecOC_Syn_Msg_Cycle);
+  Send_SecOC_Rx_Msg(SecOC_Tx_msg,Data_tx,0,1,1);
+  Waitfor_Tx_Msg(SecOC_Tx_msg,100);
+  Verify_SecOC_Tx_Msg(SecOC_Tx_msg,Data_tx,0,1,1);
+  Reset_P_Switch_ECU();
+  Waitfor_Tx_Msg(SecOC_Syn_msg,SecOC_Syn_Msg_Cycle);
+  Verify_SecOC_Sync_Msg(SecOC_Syn_msg,1,1);
+}
+/// <Master_TX_Verify>
+testcase Master_Rx_Verify_Format31_Format11_Format21()
+{
+  byte Data_Rx[16]={0x01,0x02,0x03,0x04,0x05,0x06};
+  //erase Tripcounter
+  BeginTest("Master_Rx_Verify_");
+  Reset_P_Switch_ECU();
+  Waitfor_Tx_Msg(SecOC_Syn_msg,SecOC_Syn_Msg_Cycle);
+  
+  //Format31
+  Send_SecOC_Rx_Msg(SecOC_Tx_msg,Data_Rx,0,1,1);
+  //Check XCP or test wait for tester confirm FvM_FreshnessValueArray
+  testWaitForTesterConfirmation("Correct Data",10000);
+  
+  //Format11
+  Data_Rx[0]=0x02;
+  Send_SecOC_Rx_Msg(SecOC_Tx_msg,Data_Rx,0,1,2);
+  //Check XCP or test wait for tester confirm FvM_FreshnessValueArray
+  testWaitForTesterConfirmation("Correct Data",10000);
+  
+  //Format21
+  Data_Rx[0]=0x02;
+  Send_SecOC_Rx_Msg(SecOC_Tx_msg,Data_Rx,0,1,1);
+  //Check XCP or test wait for tester confirm FvM_FreshnessValueArray
+  testWaitForTesterConfirmation("Correct Data",10000);
+  Reset_P_Switch_ECU();
+  Waitfor_Tx_Msg(SecOC_Syn_msg,SecOC_Syn_Msg_Cycle);
+  Verify_SecOC_Sync_Msg(SecOC_Syn_msg,1,1);
+}
+/// <Master_TX_Verify>
+testcase Master_Rx_Verify_Format32_Format12_Format22()
+{
+  byte Data_Rx[16]={0x01,0x02,0x03,0x04,0x05,0x06};
+  //erase Tripcounter
+  BeginTest("Master_Rx_Verify_");
+  Reset_P_Switch_ECU();
+  Waitfor_Tx_Msg(SecOC_Syn_msg,SecOC_Syn_Msg_Cycle);
+  Waitfor_Tx_Msg(SecOC_Syn_msg,SecOC_Syn_Msg_Cycle);
+  //Format32
+  Send_SecOC_Rx_Msg(SecOC_Tx_msg,Data_Rx,0,1,1);
+  //Check XCP or test wait for tester confirm FvM_FreshnessValueArray
+  testWaitForTesterConfirmation("Correct Data",10000);
+  
+  //Format12
+  Data_Rx[0]=0x02;
+  Send_SecOC_Rx_Msg(SecOC_Tx_msg,Data_Rx,0,1,2);
+  //Check XCP or test wait for tester confirm FvM_FreshnessValueArray
+  testWaitForTesterConfirmation("Correct Data",10000);
+  
+  //Format22
+  Data_Rx[0]=0x02;
+  Send_SecOC_Rx_Msg(SecOC_Tx_msg,Data_Rx,0,1,1);
+  //Check XCP or test wait for tester confirm FvM_FreshnessValueArray
+  testWaitForTesterConfirmation("Correct Data",10000);
+  Reset_P_Switch_ECU();
+  Waitfor_Tx_Msg(SecOC_Syn_msg,SecOC_Syn_Msg_Cycle);
+  Verify_SecOC_Sync_Msg(SecOC_Syn_msg,1,1);
+}
+
+/// <Master_TX_Verify>
+testcase Master_Rx_Verify_Format32_Format12_Format22_2()
+{
+  byte Data_Rx[16]={0x01,0x02,0x03,0x04,0x05,0x06};
+  //erase Tripcounter
+  BeginTest("Master_Rx_Verify_");
+  Reset_P_Switch_ECU();
+  Waitfor_Tx_Msg(SecOC_Syn_msg,SecOC_Syn_Msg_Cycle);
+  Reset_P_Switch_ECU();
+  Waitfor_Tx_Msg(SecOC_Syn_msg,SecOC_Syn_Msg_Cycle);
+  //Format32
+  Send_SecOC_Rx_Msg(SecOC_Tx_msg,Data_Rx,0,1,1);
+  //Check XCP or test wait for tester confirm FvM_FreshnessValueArray
+  testWaitForTesterConfirmation("Correct Data",10000);
+  
+  //Format12
+  Data_Rx[0]=0x02;
+  Send_SecOC_Rx_Msg(SecOC_Tx_msg,Data_Rx,0,1,2);
+  //Check XCP or test wait for tester confirm FvM_FreshnessValueArray
+  testWaitForTesterConfirmation("Correct Data",10000);
+  
+  //Format22
+  Data_Rx[0]=0x02;
+  Send_SecOC_Rx_Msg(SecOC_Tx_msg,Data_Rx,0,1,1);
+  //Check XCP or test wait for tester confirm FvM_FreshnessValueArray
+  testWaitForTesterConfirmation("Correct Data",10000);
+  Reset_P_Switch_ECU();
+  Waitfor_Tx_Msg(SecOC_Syn_msg,SecOC_Syn_Msg_Cycle);
+  Verify_SecOC_Sync_Msg(SecOC_Syn_msg,1,1);
+}
+/// <Master_TX_Verify>
+testcase Master_Rx_Verify_Format33_Format13_Format23()
+{
+  byte Data_Rx[16]={0x01,0x02,0x03,0x04,0x05,0x06};
+  //erase Tripcounter
+  BeginTest("Master_Rx_Verify_");
+  Reset_P_Switch_ECU();
+  Waitfor_Tx_Msg(SecOC_Syn_msg,SecOC_Syn_Msg_Cycle);
+
+  //Format33
+  Send_SecOC_Rx_Msg(SecOC_Tx_msg,Data_Rx,0,2,1);
+  //Check XCP or test wait for tester confirm FvM_FreshnessValueArray
+  testWaitForTesterConfirmation("Correct Data",10000);
+  
+  //Format13
+  Data_Rx[0]=0x02;
+  Send_SecOC_Rx_Msg(SecOC_Tx_msg,Data_Rx,0,2,2);
+  //Check XCP or test wait for tester confirm FvM_FreshnessValueArray
+  testWaitForTesterConfirmation("Correct Data",10000);
+  
+  //Format23
+  Data_Rx[0]=0x02;
+  Send_SecOC_Rx_Msg(SecOC_Tx_msg,Data_Rx,0,2,1);
+  //Check XCP or test wait for tester confirm FvM_FreshnessValueArray
+  testWaitForTesterConfirmation("Correct Data",10000);
+  Reset_P_Switch_ECU();
+  Waitfor_Tx_Msg(SecOC_Syn_msg,SecOC_Syn_Msg_Cycle);
+  Verify_SecOC_Sync_Msg(SecOC_Syn_msg,1,1);
+}
+
+/// <Master_TX_Verify>
+testcase Master_Rx_Verify_Format34_Format14_Format24()
+{
+  byte Data_Rx[16]={0x01,0x02,0x03,0x04,0x05,0x06};
+  //erase Tripcounter
+  BeginTest("Master_Rx_Verify_");
+  Reset_P_Switch_ECU();
+  Waitfor_Tx_Msg(SecOC_Syn_msg,SecOC_Syn_Msg_Cycle);
+
+  //Format34
+  Send_SecOC_Rx_Msg(SecOC_Tx_msg,Data_Rx,0,2,1);
+  //Check XCP or test wait for tester confirm FvM_FreshnessValueArray
+  testWaitForTesterConfirmation("Correct Data",10000);
+  
+  //Format14
+  Data_Rx[0]=0x02;
+  Send_SecOC_Rx_Msg(SecOC_Tx_msg,Data_Rx,0,2,2);
+  //Check XCP or test wait for tester confirm FvM_FreshnessValueArray
+  testWaitForTesterConfirmation("Correct Data",10000);
+  
+  //Format24
+  Data_Rx[0]=0x02;
+  Send_SecOC_Rx_Msg(SecOC_Tx_msg,Data_Rx,0,2,1);
+  //Check XCP or test wait for tester confirm FvM_FreshnessValueArray
+  testWaitForTesterConfirmation("Correct Data",10000);
+  Reset_P_Switch_ECU();
+  Waitfor_Tx_Msg(SecOC_Syn_msg,SecOC_Syn_Msg_Cycle);
+  Verify_SecOC_Sync_Msg(SecOC_Syn_msg,1,1);
+}
+

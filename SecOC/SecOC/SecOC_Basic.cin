@@ -1,0 +1,208 @@
+/*@!Encoding:1252*/
+includes
+{
+
+}
+variables
+{
+}
+
+int padToNextByte(int bitPos)
+{
+  if ((bitPos % 8) != 0)
+    bitPos += (8 - (bitPos % 8));
+  return bitPos;
+}
+
+byte packValue(byte arraytemp[], byte startByte, dword value, byte bitLen, byte bitPos)
+{
+  byte bit;
+  byte byteIndex;
+  byte bitOffset;
+  byte i=0;
+  for ( i=0; i < bitLen; i++)
+  {
+    bit = (byte)((value >> (bitLen - 1 - i)) & 0x1);
+
+    byteIndex = bitPos / 8;
+    bitOffset = 7 - (bitPos % 8);  // MSB-first trong m?i byte
+
+    arraytemp[startByte + byteIndex] |= (byte)(bit << bitOffset);
+
+    bitPos++;
+  }
+  return bitPos;
+}
+
+byte packArray(byte arraytemp[], byte startByte,
+              byte value[], byte valueLen,
+              byte bitLen, byte bitPos)
+{
+  byte i;
+  byte srcBitIndex;
+  byte srcByteIndex;
+  byte srcBitOffset;
+  byte bit;
+  byte dstByteIndex;
+  byte dstBitOffset;
+  for (i = 0; i < bitLen; i++)
+  {
+      // V? trí bit trong value[] (MSB-first)
+      srcBitIndex = i;
+      srcByteIndex = srcBitIndex / 8;
+      srcBitOffset = 7 - (srcBitIndex % 8);
+
+      if (srcByteIndex >= valueLen) {
+          break; // tránh d?c vu?t
+      }
+
+      bit = (byte)((value[srcByteIndex] >> srcBitOffset) & 0x1);
+
+      // V? trí ghi vào arraytemp
+      dstByteIndex = bitPos / 8;
+      dstBitOffset = 7 - (bitPos % 8);
+
+      arraytemp[startByte + dstByteIndex] |= (byte)(bit << dstBitOffset);
+
+      bitPos++;
+  }
+  return bitPos;
+}
+
+/* Ghi  bit vào arraytemp theo MSB-first trong m?i byte */
+void write_bit_msb(byte arraytemp[], int startByte, int bitPos, byte bit)
+{
+  int dstByteIndex;
+  int dstBitOffset;
+  dstByteIndex = bitPos / 8;
+  dstBitOffset = 7 - (bitPos % 8);
+  arraytemp[startByte + dstByteIndex] |= (byte)(bit << dstBitOffset);
+}
+
+/* 1) L?y bit t? phía LSB c?a value (uint32) nhung GHI MSB-first (left-justified) */
+int packValueFromLSB_MSBOut(byte arraytemp[], int startByte, dword value, int bitLen, int bitPos)
+{
+  int i;
+  byte b;
+  dword mask;
+  dword sub;
+  if (bitLen <= 0) return bitPos;
+  if (bitLen > 32) bitLen = 32;  // gi?i h?n cho uint32
+
+  /* Gi? l?i dúng bitLen bit th?p (không d?o bit) */
+   mask = (bitLen == 32) ? 0xFFFFFFFF : ((1 << bitLen) - 1);
+   sub = value & mask;
+
+  /* Ghi MSB c?a "sub" tru?c (bit bitLen-1) -> LSB c?a "sub" sau (bit 0) */
+  for (i = 0; i < bitLen; ++i) {
+      b = (byte)((sub >> (bitLen - 1 - i)) & 0x1);
+      write_bit_msb(arraytemp, startByte, bitPos + i, b);
+  }
+  return bitPos + bitLen;
+}
+
+/* 2) L?y bit t? phía LSB c?a m?t m?ng giá tr? MSB-first (value[]) r?i GHI MSB-first */
+int packArrayFromLSB_MSBOut(byte arraytemp[], byte startByte,
+                            byte value[], byte valueLen,
+                            byte bitLen, byte bitPos)
+{
+  byte totalBits;
+  byte startBit;
+  byte k,lin,sByte,sBit;
+  byte bit;
+  byte ret;
+  
+  if (bitLen <= 0 || valueLen <= 0) return bitPos;
+
+  totalBits = valueLen * 8;
+  if (bitLen > totalBits) bitLen = totalBits;
+
+  /* Ch?n c?a s? bitLen bit th?p: ch? s? bit tuy?n tính (0 = MSB c?a value[0]) */
+  startBit = totalBits - bitLen;  // MSB c?a c?a s?
+
+  for (k = 0; k < bitLen; ++k) {
+      lin = startBit + k;               // bit th? k (t? MSB c?a c?a s?)
+      sByte = lin / 8;
+      sBit  = 7 - (lin % 8);            // MSB-first trong t?ng byte ngu?n
+
+      bit = (byte)((value[sByte] >> sBit) & 0x1);
+      write_bit_msb(arraytemp, startByte, bitPos + k, bit);
+  }
+  ret=bitPos + bitLen;
+  return ret;
+}
+
+int extractBitsMSB_nibbleAligned(byte src[], int srcLen, int bitLen, byte dest[])
+{
+  int totalBits;
+  int pad;
+  int effectiveBits;
+  int outLen;
+  byte tmp[32];
+  int tByte;
+  int tBit;
+  byte bit;
+  int sBit;
+  int sb;
+  int i;
+  byte hi;
+  byte lo;
+  totalBits = srcLen * 8;
+  if (bitLen < 0) bitLen = 0;
+  if (bitLen > totalBits) bitLen = totalBits;
+
+  pad = (8 - (bitLen % 8)) & 7;          // 0..7
+  effectiveBits = bitLen + pad;          // s? bit c?n d? d? byte sau d?ch
+  outLen = effectiveBits / 8;            // s? byte output
+  if (outLen == 0) return 0;
+
+                        // d? cho 256 bit; tang n?u c?n
+  if (outLen > (int)elCount(tmp)) return -1;  // b?o v?
+  for (i = 0; i < elcount(tmp); i++) {
+    tmp[i] = 0;
+  }
+  for (i = 0; i < elcount(dest); i++) {
+    dest[i] = 0;
+  }
+//  memset(tmp, 0, outLen);
+//  memset(dest, 0, outLen);
+
+  /* Bu?c 1: copy effectiveBits tr?c ti?p t? MSB c?a src vào tmp (MSB-first) */
+  for (i = 0; i < effectiveBits; ++i) {
+      sb = i;                            // source bit index (tính t? MSB d?u)
+      
+      bit = 0;
+      if (sb < totalBits) {
+          int sByte;
+          sByte = sb / 8;
+          sBit  = 7 - (sb % 8);
+          bit = (src[sByte] >> sBit) & 1;
+      }
+      
+      tByte = i / 8;
+      tBit  = 7 - (i % 8);
+      tmp[tByte] |= (byte)(bit << tBit);
+  }
+
+  /* Bu?c 2: d?ch ph?i toàn b? buffer tmp di 'pad' bit d? nibble-align */
+  if (pad == 0) {
+      memcpy(dest, tmp, outLen);
+  } else {
+      for (i = 0; i < outLen; ++i) {
+          hi = tmp[i] >> pad;
+          lo = (i > 0) ? (byte)(tmp[i-1] << (8 - pad)) : 0;
+          dest[i] = (byte)(hi | lo);
+      }
+  }
+
+  return outLen;
+}
+
+void uint64ToMSBArray(qword value, byte out[],byte num_bytes)
+{
+  int i;
+  for (i=0; i<num_bytes;i++)
+  {
+    out[i] |= (byte)((value >> (num_bytes-i-1)*8) & 0xFF);
+  }
+}

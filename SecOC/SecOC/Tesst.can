@@ -1,0 +1,52 @@
+﻿/*@!Encoding:65001*/
+includes
+{
+  #include "E2E_Simulation.cin"
+}
+
+variables
+{
+  message ICBAD_BKPCANFD_100ms_FrP29 ICBAD_BKPCANFD_100ms_FrP29_msg;
+  pdu ICBAD_100ms_PDU29 ICBAD_100ms_PDU29_pdu;
+  byte key_auth[16] = {0x45,0xA3,0xD7,0x86,0x30,0x38,0x97,0x1B,0x77,0xDB,0x79,0x97,0x2C,0xAD,0x76,0xDE};
+  byte data[18]={0x03,0x95/*ID*/,0xFF,0xFF,0xFF,0xFF,0xFF,0x03,0x00,0x00/*Data*/,0x00,0x00,0x01/*trip*/,0x00,0x01/*reset*/,0x00,0x00,0x05};
+  
+  byte dataLength=18;
+  byte data2[64]={0x05,0x6f/*ID*/,0x00,0x00,0x01/*trip*/,0x00,0x01/*reset*/};
+  byte dataLength2=7;
+  byte cmac[16];
+}
+on start
+{
+    cmac_sm4(key_auth, data, dataLength, cmac);
+    write("Txcmac0 %x",cmac[0]);
+    write("Txcmac1 %x",cmac[1]);
+    write("Txcmac2 %x",cmac[2]);
+//    write("Txcmac3 %x",cmac[3]);
+//    write("cmac4 %x",cmac[4]);
+//    write("cmac5 %x",cmac[5]);
+//    write("cmac6 %x",cmac[6]);
+//    write("cmac7 %x",cmac[7]);
+//    write("cmac8 %x",cmac[8]);
+  
+    cmac_sm4(key_auth, data2, dataLength2, cmac);
+    write("Synccmac0 %x",cmac[0]);
+    write("Synccmac1 %x",cmac[1]);
+    write("Synccmac2 %x",cmac[2]);
+//    write("cmac3 %x",cmac[3]);
+//    write("cmac4 %x",cmac[4]);
+//    write("cmac5 %x",cmac[5]);
+//    write("cmac6 %x",cmac[6]);
+//    write("cmac7 %x",cmac[7]);
+//    write("cmac8 %x",cmac[8]);
+}
+on message*
+{
+  if(this.id ==0x395)
+  {
+
+  }
+}
+
+
+

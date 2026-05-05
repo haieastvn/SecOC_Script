@@ -1,0 +1,13 @@
+<testmodule title="SecOC" version="R07">
+  <testgroup title="Master">
+   	 <capltestcase  name="Master_Sync_Verify_"/>
+   	 <capltestcase  name="Master_Tx_Verify_"/>
+   	 <capltestcase  name="Master_Rx_Verify_Format31_Format11_Format21"/>
+  	 <capltestcase  name="Master_Rx_Verify_Format32_Format12_Format22"/>
+	 <capltestcase  name="Master_Rx_Verify_Format32_Format12_Format22_2"/>
+	 <capltestcase  name="Master_Rx_Verify_Format33_Format13_Format23"/>
+	 <capltestcase  name="Master_Rx_Verify_Format34_Format14_Format24"/>	 
+  </testgroup>
+
+ 
+</testmodule>
